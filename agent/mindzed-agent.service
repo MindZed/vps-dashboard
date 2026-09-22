@@ -1,0 +1,26 @@
+[Unit]
+Description=MindZed VPS Agent Daemon (Resource Vitals & DB Provisioner)
+After=network.target postgresql.service docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/mindzed-agent
+ExecStart=/opt/mindzed-agent/mindzed-agent
+Restart=always
+RestartSec=5s
+EnvironmentFile=-/opt/mindzed-agent/.env
+
+# Security Sandbox
+ProtectSystem=full
+ProtectHome=true
+NoNewPrivileges=true
+PrivateTmp=true
+
+# Resource limits (ensures ultra-lightweight footprint < 15MB)
+MemoryMax=50M
+CPUQuota=20%
+
+[Install]
+WantedBy=multi-user.target
