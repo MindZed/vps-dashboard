@@ -135,6 +135,8 @@ export function generateSecretKey(): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+const DEFAULT_AGENT_SECRET = "dfb2bd78acdzfdxarf379161b46bd31e0890610fab9028x1";
+
 export function getAgentConfig() {
   if (typeof window !== "undefined") {
     const savedUrl = localStorage.getItem("mindzed_agent_url");
@@ -143,17 +145,17 @@ export function getAgentConfig() {
 
     return {
       baseUrl: savedUrl || process.env.NEXT_PUBLIC_AGENT_URL || "https://agent.mindzed.tech",
-      secret: savedSecret || process.env.NEXT_PUBLIC_AGENT_SECRET || "",
+      secret: savedSecret || process.env.NEXT_PUBLIC_AGENT_SECRET || DEFAULT_AGENT_SECRET,
       forceDemo: savedMode === "true",
-      hasCustomKey: Boolean(savedSecret || process.env.NEXT_PUBLIC_AGENT_SECRET),
+      hasCustomKey: Boolean(savedSecret || process.env.NEXT_PUBLIC_AGENT_SECRET || DEFAULT_AGENT_SECRET),
     };
   }
 
   return {
     baseUrl: process.env.NEXT_PUBLIC_AGENT_URL || "https://agent.mindzed.tech",
-    secret: process.env.AGENT_SECRET || process.env.NEXT_PUBLIC_AGENT_SECRET || "",
+    secret: process.env.AGENT_SECRET || process.env.NEXT_PUBLIC_AGENT_SECRET || DEFAULT_AGENT_SECRET,
     forceDemo: false,
-    hasCustomKey: Boolean(process.env.AGENT_SECRET || process.env.NEXT_PUBLIC_AGENT_SECRET),
+    hasCustomKey: Boolean(process.env.AGENT_SECRET || process.env.NEXT_PUBLIC_AGENT_SECRET || DEFAULT_AGENT_SECRET),
   };
 }
 

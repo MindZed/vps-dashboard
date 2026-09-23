@@ -41,8 +41,6 @@ RUN chmod +x /app/mindzed-agent
 ENV WHITELIST_FILE=/app/data/whitelist.json
 
 EXPOSE 8080
-
-HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-  CMD sh -c "wget --no-verbose --tries=1 --spider http://localhost:${PORT:-8080}/health || exit 1"
+EXPOSE 8050
 
 CMD ["/app/mindzed-agent"]
