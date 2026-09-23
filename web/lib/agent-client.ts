@@ -714,48 +714,10 @@ export interface SqlQueryResponse {
   error?: string;
 }
 
-// Mock state for Explorer demo fallback
-const mockExplorerTables: Record<string, ExplorerTable[]> = {
-  db_student_erp_dev: [
-    { name: "students", schema: "public", estimated_rows: 12, size_bytes: 32768 },
-    { name: "courses", schema: "public", estimated_rows: 5, size_bytes: 16384 },
-    { name: "enrollments", schema: "public", estimated_rows: 24, size_bytes: 49152 },
-  ],
-  db_testing_dev: [
-    { name: "users", schema: "public", estimated_rows: 8, size_bytes: 24576 },
-    { name: "audit_logs", schema: "public", estimated_rows: 45, size_bytes: 65536 },
-  ],
-};
-
-const mockExplorerColumns: Record<string, ExplorerColumn[]> = {
-  students: [
-    { name: "id", data_type: "uuid", udt_name: "uuid", is_nullable: false, default_value: "gen_random_uuid()", is_primary_key: true },
-    { name: "full_name", data_type: "character varying", udt_name: "varchar", is_nullable: false, default_value: "", is_primary_key: false },
-    { name: "roll_number", data_type: "integer", udt_name: "int4", is_nullable: false, default_value: "", is_primary_key: false },
-    { name: "is_active", data_type: "boolean", udt_name: "bool", is_nullable: false, default_value: "true", is_primary_key: false },
-    { name: "metadata", data_type: "jsonb", udt_name: "jsonb", is_nullable: true, default_value: "'{}'::jsonb", is_primary_key: false },
-    { name: "created_at", data_type: "timestamp with time zone", udt_name: "timestamptz", is_nullable: false, default_value: "now()", is_primary_key: false },
-  ],
-  users: [
-    { name: "id", data_type: "uuid", udt_name: "uuid", is_nullable: false, default_value: "gen_random_uuid()", is_primary_key: true },
-    { name: "email", data_type: "character varying", udt_name: "varchar", is_nullable: false, default_value: "", is_primary_key: false },
-    { name: "role", data_type: "character varying", udt_name: "varchar", is_nullable: false, default_value: "'member'", is_primary_key: false },
-    { name: "is_active", data_type: "boolean", udt_name: "bool", is_nullable: false, default_value: "true", is_primary_key: false },
-    { name: "created_at", data_type: "timestamp with time zone", udt_name: "timestamptz", is_nullable: false, default_value: "now()", is_primary_key: false },
-  ],
-};
-
-const mockExplorerRows: Record<string, Record<string, any>[]> = {
-  students: [
-    { id: "e58ed763-928c-4155-bee9-fdbaaadc15f3", full_name: "Aarav Sharma", roll_number: 101, is_active: true, metadata: { section: "A", gpa: 3.9 }, created_at: "2026-09-20T10:15:30Z" },
-    { id: "a71f0345-4231-482a-9cb8-6f917531d044", full_name: "Diya Patel", roll_number: 102, is_active: true, metadata: { section: "A", gpa: 3.8 }, created_at: "2026-09-21T11:20:00Z" },
-    { id: "c384a821-2a10-48e3-b4e8-8a8b19ff5621", full_name: "Rohan Verma", roll_number: 103, is_active: false, metadata: { section: "B", gpa: 3.2 }, created_at: "2026-09-22T09:40:15Z" },
-  ],
-  users: [
-    { id: "b21a8f90-1123-4567-890a-bcdef0123456", email: "admin@mindzed.tech", role: "admin", is_active: true, created_at: "2026-09-23T14:00:00Z" },
-    { id: "c34b9a01-2234-5678-901b-cdef01234567", email: "dev@mindzed.tech", role: "developer", is_active: true, created_at: "2026-09-23T15:30:00Z" },
-  ],
-};
+// Mock state for Explorer demo fallback (empty by default so only real PostgreSQL tables are displayed)
+const mockExplorerTables: Record<string, ExplorerTable[]> = {};
+const mockExplorerColumns: Record<string, ExplorerColumn[]> = {};
+const mockExplorerRows: Record<string, Record<string, any>[]> = {};
 
 export async function fetchTables(database: string): Promise<ExplorerTable[]> {
   const config = getAgentConfig();
@@ -769,13 +731,16 @@ export async function fetchTables(database: string): Promise<ExplorerTable[]> {
         const data = await res.json();
         return data.tables || [];
       }
-    } catch {
-      // Fall through to mock
+      if (res.status === 404) {
+        throw new Error("Backend explorer endpoints returned 404. Please click 'Redeploy' on mindzed-agent in Dokploy to update the Go binary.");
+      }
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || `Server error (${res.status})`);
+    } catch (e: any) {
+      throw e;
     }
   }
-  return mockExplorerTables[database] || [
-    { name: "items", schema: "public", estimated_rows: 0, size_bytes: 8192 },
-  ];
+  return mockExplorerTables[database] || [];
 }
 
 export async function fetchTableSchema(
@@ -799,16 +764,13 @@ export async function fetchTableSchema(
           indexes: data.indexes || [],
         };
       }
+      return { columns: [], indexes: [] };
     } catch {
-      // Fall through to mock
+      return { columns: [], indexes: [] };
     }
   }
 
-  const cols = mockExplorerColumns[table] || [
-    { name: "id", data_type: "uuid", udt_name: "uuid", is_nullable: false, default_value: "gen_random_uuid()", is_primary_key: true },
-    { name: "name", data_type: "text", udt_name: "text", is_nullable: false, default_value: "", is_primary_key: false },
-    { name: "created_at", data_type: "timestamptz", udt_name: "timestamptz", is_nullable: false, default_value: "now()", is_primary_key: false },
-  ];
+  const cols = mockExplorerColumns[table] || [];
   return { columns: cols, indexes: [] };
 }
 
@@ -832,8 +794,10 @@ export async function fetchTableRows(
       if (res.ok) {
         return await res.json();
       }
-    } catch {
-      // Fall through to mock
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || `Failed to fetch rows (${res.status})`);
+    } catch (e: any) {
+      throw e;
     }
   }
 
@@ -844,7 +808,7 @@ export async function fetchTableRows(
     page: options.page || 1,
     limit: options.limit || 50,
     total_count: rows.length,
-    columns: rows.length > 0 ? Object.keys(rows[0]) : ["id", "name", "created_at"],
+    columns: rows.length > 0 ? Object.keys(rows[0]) : [],
     rows,
   };
 }

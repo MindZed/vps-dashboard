@@ -66,6 +66,7 @@ export default function DatabaseStudioPage() {
   const [selectedTable, setSelectedTable] = useState<string>("");
   const [tableSearch, setTableSearch] = useState("");
   const [loadingTables, setLoadingTables] = useState(true);
+  const [tablesError, setTablesError] = useState<string | null>(null);
 
   // Schema state
   const [columns, setColumns] = useState<ExplorerColumn[]>([]);
@@ -121,6 +122,7 @@ export default function DatabaseStudioPage() {
   const loadTablesList = useCallback(async (selectFirst = false) => {
     if (!dbName) return;
     setLoadingTables(true);
+    setTablesError(null);
     try {
       const list = await fetchTables(dbName);
       setTables(list);
@@ -134,6 +136,7 @@ export default function DatabaseStudioPage() {
         setColumns([]);
       }
     } catch (err: any) {
+      setTablesError(err.message || "Failed to load database tables");
       showToast(err.message || "Failed to load database tables", "error");
     } finally {
       setLoadingTables(false);
@@ -508,6 +511,18 @@ export default function DatabaseStudioPage() {
 
           {/* Tables List */}
           <div className="flex-1 overflow-y-auto p-2 space-y-1">
+            {tablesError && (
+              <div className="p-3 mb-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs space-y-1.5">
+                <div className="flex items-center gap-1.5 font-semibold text-amber-400">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>Redeploy Required</span>
+                </div>
+                <p className="text-[11px] text-amber-200/80 leading-relaxed font-sans">
+                  The Go Agent hasn&apos;t loaded the explorer endpoints yet. Click <strong>Redeploy</strong> on <code>mindzed-agent</code> in Dokploy.
+                </p>
+              </div>
+            )}
+
             {loadingTables ? (
               <div className="flex items-center justify-center p-8 text-xs text-slate-500 gap-2">
                 <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />
