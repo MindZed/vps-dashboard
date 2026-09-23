@@ -48,10 +48,13 @@ export default function ConnectionCard({ data, onClose }: ConnectionCardProps) {
       if (data.password && data.password !== "•••(managed)•••") {
         setShowPassword(true);
       }
+    } else {
+      setCardData(null);
     }
   }, [data]);
 
-  if (!cardData) return null;
+  // If parent closed the modal or data is null, immediately render nothing!
+  if (!data || !cardData) return null;
 
   const isManaged = cardData.password === "•••(managed)•••";
 
@@ -146,7 +149,7 @@ PG_DATABASE="${cardData.database}"
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={onClose}
-          className="fixed inset-0 bg-black/80 backdrop-blur-sm"
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm cursor-pointer"
         />
 
         <motion.div
@@ -173,52 +176,65 @@ PG_DATABASE="${cardData.database}"
             </div>
             <button
               onClick={onClose}
-              className="p-1 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+              className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors cursor-pointer"
+              title="Close modal"
             >
               <X className="h-5 w-5" />
             </button>
           </div>
 
-          {/* Credentials Summary Pill Bar */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 my-4 p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-xs">
-            <div>
-              <span className="text-[10px] text-zinc-500 font-mono block">DATABASE NAME</span>
-              <span className="font-mono text-white font-semibold truncate block">{cardData.database}</span>
+          {/* Credentials Summary Box */}
+          <div className="my-4 p-3.5 rounded-xl bg-zinc-950 border border-zinc-800 space-y-3 text-xs">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <span className="text-[10px] text-zinc-500 font-mono block">DATABASE NAME</span>
+                <span className="font-mono text-white font-semibold truncate block text-xs">{cardData.database}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-zinc-500 font-mono block">DATABASE USER</span>
+                <span className="font-mono text-sky-400 font-semibold truncate block text-xs">{cardData.username}</span>
+              </div>
             </div>
-            <div>
-              <span className="text-[10px] text-zinc-500 font-mono block">DATABASE USER</span>
-              <span className="font-mono text-sky-400 font-semibold truncate block">{cardData.username}</span>
-            </div>
-            <div className="col-span-2 sm:col-span-1 flex flex-col justify-center">
-              <div className="flex items-center justify-between mb-0.5">
-                <span className="text-[10px] text-zinc-500 font-mono block">PASSWORD</span>
+
+            <div className="pt-2.5 border-t border-zinc-850">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10px] text-zinc-500 font-mono">DATABASE PASSWORD</span>
                 <button
                   type="button"
                   onClick={handleResetPassword}
                   disabled={isResetting}
-                  className="text-[10px] text-emerald-400 hover:text-emerald-300 font-mono flex items-center gap-1 hover:underline cursor-pointer disabled:opacity-50"
+                  className="text-[11px] text-emerald-400 hover:text-emerald-300 font-mono flex items-center gap-1 hover:underline cursor-pointer disabled:opacity-50"
                   title="Generate a new secure 32-character crypto password"
                 >
-                  <RefreshCw className={`h-2.5 w-2.5 ${isResetting ? "animate-spin" : ""}`} />
-                  <span>{isResetting ? "Rotating..." : isManaged ? "Set New Key" : "Rotate"}</span>
+                  <RefreshCw className={`h-3 w-3 ${isResetting ? "animate-spin" : ""}`} />
+                  <span>{isResetting ? "Rotating..." : isManaged ? "Set New Key" : "Rotate Password"}</span>
                 </button>
               </div>
-              <div className="flex items-center gap-1.5">
-                <span className="font-mono text-zinc-200 font-semibold truncate">
+              <div className="flex items-center gap-2">
+                <div className="flex-1 font-mono text-xs px-2.5 py-1.5 rounded-lg bg-black/60 border border-zinc-800 text-zinc-200 select-all overflow-x-auto whitespace-nowrap">
                   {isManaged
-                    ? "••••••••••••••••"
+                    ? "•••••••••••••••• (Encrypted in PostgreSQL)"
                     : showPassword
                     ? cardData.password
-                    : "••••••••••••••••"}
-                </span>
+                    : "••••••••••••••••••••••••••••••••"}
+                </div>
                 {!isManaged && (
-                  <button
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="text-zinc-500 hover:text-white p-0.5"
-                    title={showPassword ? "Hide password" : "Show password"}
-                  >
-                    {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                  </button>
+                  <>
+                    <button
+                      onClick={() => handleCopy(cardData.password, "pw")}
+                      className="p-1.5 rounded-lg bg-zinc-850 hover:bg-zinc-800 text-zinc-300 hover:text-white transition-colors cursor-pointer"
+                      title="Copy password"
+                    >
+                      {copiedKey === "pw" ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                    </button>
+                    <button
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="p-1.5 rounded-lg bg-zinc-850 hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                      title={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                    </button>
+                  </>
                 )}
               </div>
             </div>
@@ -293,25 +309,30 @@ PG_DATABASE="${cardData.database}"
               </div>
             )}
 
-            {/* Connection URL Code Block */}
-            <div className="relative rounded-xl bg-zinc-950 border border-zinc-800 p-3.5 font-mono text-xs text-zinc-200 break-all select-all flex items-center justify-between gap-3">
-              <span className="overflow-x-auto text-white">{getMaskedUrl(currentTab.url)}</span>
-              <button
-                onClick={() => handleCopy(currentTab.url, "url")}
-                className="shrink-0 p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white transition-all flex items-center gap-1.5 text-xs font-sans font-medium cursor-pointer"
-              >
-                {copiedKey === "url" ? (
-                  <>
-                    <Check className="h-3.5 w-3.5 text-emerald-400" />
-                    <span className="text-emerald-400 font-semibold">Copied</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-3.5 w-3.5" />
-                    <span>Copy</span>
-                  </>
-                )}
-              </button>
+            {/* Sleek Single-Line Connection URL Code Block */}
+            <div className="rounded-xl bg-zinc-950 border border-zinc-800 p-3 space-y-2">
+              <div className="flex items-center justify-between text-[11px] font-mono text-zinc-400">
+                <span className="text-zinc-500 uppercase tracking-wider text-[10px] font-semibold">DATABASE URL ({currentTab.portBadge})</span>
+                <button
+                  onClick={() => handleCopy(currentTab.url, "url")}
+                  className="px-2.5 py-1 rounded-lg bg-zinc-850 hover:bg-zinc-750 text-white transition-all flex items-center gap-1.5 text-xs font-sans font-medium cursor-pointer"
+                >
+                  {copiedKey === "url" ? (
+                    <>
+                      <Check className="h-3.5 w-3.5 text-emerald-400" />
+                      <span className="text-emerald-400 font-semibold">Copied</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3.5 w-3.5" />
+                      <span>Copy URL</span>
+                    </>
+                  )}
+                </button>
+              </div>
+              <div className="p-2.5 rounded-lg bg-black/80 border border-zinc-800/80 font-mono text-xs text-emerald-400 overflow-x-auto whitespace-nowrap select-all scrollbar-thin">
+                {getMaskedUrl(currentTab.url)}
+              </div>
             </div>
 
             {/* SSH helper command if applicable */}

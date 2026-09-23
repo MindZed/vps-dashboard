@@ -396,11 +396,11 @@ export default function DatabasesPage() {
                         <div className="flex items-center justify-end gap-2">
                           <button
                             onClick={() => handleOpenExistingConnection(db)}
-                            className="px-2.5 py-1 rounded-lg text-xs font-sans font-medium text-zinc-200 hover:text-white bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 transition-colors flex items-center gap-1 cursor-pointer"
-                            title="View connection URLs"
+                            className="px-2.5 py-1 rounded-lg text-xs font-sans font-medium text-zinc-200 hover:text-white bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 transition-colors flex items-center gap-1.5 cursor-pointer"
+                            title="View connection URLs & credentials"
                           >
                             <KeyRound className="h-3 w-3" />
-                            <span>Connect</span>
+                            <span>Connection Info</span>
                           </button>
 
                           <button
@@ -428,10 +428,12 @@ export default function DatabasesPage() {
         onCreated={handleDatabaseCreated}
       />
 
-      <ConnectionCard
-        data={connectionModalData}
-        onClose={() => setConnectionModalData(null)}
-      />
+      {connectionModalData && (
+        <ConnectionCard
+          data={connectionModalData}
+          onClose={() => setConnectionModalData(null)}
+        />
+      )}
 
       {/* Safe 2-Step Delete Confirmation Dialog (Soft Rose Alert) */}
       {dbToDelete && (
