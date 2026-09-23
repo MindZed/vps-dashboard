@@ -211,7 +211,7 @@ func (m *DBManager) CreateDatabase(c *gin.Context) {
 	}
 
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Second)
-	defer cancel
+	defer cancel()
 
 	// 1. Create or update user with encrypted password safely
 	userSQL := fmt.Sprintf(`
@@ -281,7 +281,7 @@ func (m *DBManager) ListDatabases(c *gin.Context) {
 	}
 
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
-	defer cancel
+	defer cancel()
 
 	// 1. Query active client connections per database
 	activeConns := make(map[string]int)
@@ -396,7 +396,7 @@ func (m *DBManager) DeleteDatabase(c *gin.Context) {
 	}
 
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Second)
-	defer cancel
+	defer cancel()
 
 	terminateSQL := `
 		SELECT pg_terminate_backend(pid) 

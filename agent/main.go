@@ -69,7 +69,7 @@ func main() {
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel
+	defer cancel()
 
 	var pool *pgxpool.Pool
 	var err error
@@ -192,7 +192,7 @@ func main() {
 	log.Println("[INFO] Shutting down MindZed Agent...")
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer shutdownCancel
+	defer shutdownCancel()
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		log.Fatalf("[FATAL] Server forced to shutdown: %v", err)
 	}
