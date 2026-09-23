@@ -89,7 +89,7 @@ let mockDatabases: DatabaseSummary[] = [
     connections: {
       dokploy_internal: "postgresql://usr_mindzed_core:••••••••@postgres:5432/db_mindzed_core_prod",
       ssh_tunnel: "postgresql://usr_mindzed_core:••••••••@localhost:5433/db_mindzed_core_prod",
-      external_vercel: "postgresql://usr_mindzed_core:••••••••@vps-host:5432/db_mindzed_core_prod?sslmode=disable",
+      external_vercel: "postgresql://usr_mindzed_core:••••••••@vps-host:6432/db_mindzed_core_prod?sslmode=disable",
     },
   },
   {
@@ -103,7 +103,7 @@ let mockDatabases: DatabaseSummary[] = [
     connections: {
       dokploy_internal: "postgresql://usr_client_crm:••••••••@postgres:5432/db_client_crm_staging",
       ssh_tunnel: "postgresql://usr_client_crm:••••••••@localhost:5433/db_client_crm_staging",
-      external_vercel: "postgresql://usr_client_crm:••••••••@vps-host:5432/db_client_crm_staging?sslmode=disable",
+      external_vercel: "postgresql://usr_client_crm:••••••••@vps-host:6432/db_client_crm_staging?sslmode=disable",
     },
   },
   {
@@ -117,7 +117,7 @@ let mockDatabases: DatabaseSummary[] = [
     connections: {
       dokploy_internal: "postgresql://usr_analytics:••••••••@postgres:5432/db_analytics_dev",
       ssh_tunnel: "postgresql://usr_analytics:••••••••@localhost:5433/db_analytics_dev",
-      external_vercel: "postgresql://usr_analytics:••••••••@vps-host:5432/db_analytics_dev?sslmode=disable",
+      external_vercel: "postgresql://usr_analytics:••••••••@vps-host:6432/db_analytics_dev?sslmode=disable",
     },
   },
 ];
@@ -331,7 +331,7 @@ export async function fetchNetworkPorts(): Promise<{ data: NetworkPortsResponse;
 
 export async function fetchDatabases(): Promise<{ 
   databases: DatabaseSummary[]; 
-  clusterInfo?: { internal_host: string; external_host: string; port: string; ssh_port: string }; 
+  clusterInfo?: { internal_host: string; external_host: string; port: string; pgbouncer_port?: string; ssh_port: string }; 
   isMock: boolean 
 }> {
   const config = getAgentConfig();
@@ -367,6 +367,7 @@ export async function fetchDatabases(): Promise<{
       internal_host: "postgres",
       external_host: "vps-host",
       port: "5432",
+      pgbouncer_port: "6432",
       ssh_port: "5433",
     },
     isMock: true,
@@ -414,7 +415,7 @@ export async function createDatabaseApi(
     connections: {
       dokploy_internal: `postgresql://${userName}:${password}@postgres:5432/${dbName}`,
       ssh_tunnel: `postgresql://${userName}:${password}@localhost:5433/${dbName}`,
-      external_vercel: `postgresql://${userName}:${password}@vps-host:5432/${dbName}?sslmode=disable`,
+      external_vercel: `postgresql://${userName}:${password}@vps-host:6432/${dbName}?sslmode=disable`,
     },
     created_at: new Date().toISOString(),
   };

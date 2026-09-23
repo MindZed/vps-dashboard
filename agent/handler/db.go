@@ -30,6 +30,7 @@ type DBManager struct {
 	InternalHost  string
 	ExternalHost  string
 	Port          string
+	PGBouncerPort string
 	SSHPort       string
 	WhitelistFile string
 	whitelistMu   sync.RWMutex
@@ -65,6 +66,11 @@ func NewDBManager(pool *pgxpool.Pool) *DBManager {
 		port = "5432"
 	}
 
+	pgBouncerPort := os.Getenv("PGBOUNCER_PORT")
+	if pgBouncerPort == "" {
+		pgBouncerPort = "6432"
+	}
+
 	sshPort := os.Getenv("SSH_LOCAL_PORT")
 	if sshPort == "" {
 		sshPort = "5433"
@@ -80,6 +86,7 @@ func NewDBManager(pool *pgxpool.Pool) *DBManager {
 		InternalHost:  internalHost,
 		ExternalHost:  externalHost,
 		Port:          port,
+		PGBouncerPort: pgBouncerPort,
 		SSHPort:       sshPort,
 		WhitelistFile: whitelistFile,
 	}
@@ -260,7 +267,7 @@ func (m *DBManager) CreateDatabase(c *gin.Context) {
 	connections := ConnectionURLs{
 		DokployInternal: fmt.Sprintf("postgresql://%s:%s@%s:%s/%s", userName, password, m.InternalHost, m.Port, dbName),
 		SSHTunnel:       fmt.Sprintf("postgresql://%s:%s@localhost:%s/%s", userName, password, m.SSHPort, dbName),
-		ExternalVercel:  fmt.Sprintf("postgresql://%s:%s@%s:%s/%s?sslmode=disable", userName, password, m.ExternalHost, m.Port, dbName),
+		ExternalVercel:  fmt.Sprintf("postgresql://%s:%s@%s:%s/%s?sslmode=disable", userName, password, m.ExternalHost, m.PGBouncerPort, dbName),
 	}
 
 	c.JSON(http.StatusCreated, CreateDatabaseResponse{
@@ -345,7 +352,7 @@ func (m *DBManager) ListDatabases(c *gin.Context) {
 		connTemplates := ConnectionURLs{
 			DokployInternal: fmt.Sprintf("postgresql://%s:••••••••@%s:%s/%s", owner, m.InternalHost, m.Port, name),
 			SSHTunnel:       fmt.Sprintf("postgresql://%s:••••••••@localhost:%s/%s", owner, m.SSHPort, name),
-			ExternalVercel:  fmt.Sprintf("postgresql://%s:••••••••@%s:%s/%s?sslmode=disable", owner, m.ExternalHost, m.Port, name),
+			ExternalVercel:  fmt.Sprintf("postgresql://%s:••••••••@%s:%s/%s?sslmode=disable", owner, m.ExternalHost, m.PGBouncerPort, name),
 		}
 
 		databases = append(databases, DatabaseSummary{
@@ -368,10 +375,11 @@ func (m *DBManager) ListDatabases(c *gin.Context) {
 		"count":     len(databases),
 		"databases": databases,
 		"cluster_info": gin.H{
-			"internal_host": m.InternalHost,
-			"external_host": m.ExternalHost,
-			"port":          m.Port,
-			"ssh_port":      m.SSHPort,
+			"internal_host":   m.InternalHost,
+			"external_host":   m.ExternalHost,
+			"port":            m.Port,
+			"pgbouncer_port":  m.PGBouncerPort,
+			"ssh_port":        m.SSHPort,
 		},
 	})
 }

@@ -125,6 +125,8 @@ func inferServiceName(port uint32) string {
 		return "PostgreSQL SSH Tunnel Forward"
 	case 6379:
 		return "Redis In-Memory Cache"
+	case 6432:
+		return "PgBouncer Connection Pooler"
 	case 8080:
 		return "MindZed Agent API"
 	case 9000:

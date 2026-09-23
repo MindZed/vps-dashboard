@@ -45,7 +45,7 @@ export default function DatabasesPage() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  const [clusterInfo, setClusterInfo] = useState<{ internal_host: string; external_host: string; port: string; ssh_port: string } | null>(null);
+  const [clusterInfo, setClusterInfo] = useState<{ internal_host: string; external_host: string; port: string; pgbouncer_port?: string; ssh_port: string } | null>(null);
 
   const loadDatabases = async () => {
     try {
@@ -113,6 +113,7 @@ export default function DatabasesPage() {
     const extHost = clusterInfo?.external_host || "vps-host";
     const sshPort = clusterInfo?.ssh_port || "5433";
     const port = clusterInfo?.port || "5432";
+    const pgbouncerPort = clusterInfo?.pgbouncer_port || "6432";
 
     setConnectionModalData({
       success: true,
@@ -122,7 +123,7 @@ export default function DatabasesPage() {
       connections: {
         dokploy_internal: `postgresql://${db.owner}:••••••••@${intHost}:${port}/${db.name}`,
         ssh_tunnel: `postgresql://${db.owner}:••••••••@localhost:${sshPort}/${db.name}`,
-        external_vercel: `postgresql://${db.owner}:••••••••@${extHost}:${port}/${db.name}?sslmode=disable`,
+        external_vercel: `postgresql://${db.owner}:••••••••@${extHost}:${pgbouncerPort}/${db.name}?sslmode=disable`,
       },
       created_at: new Date().toISOString(),
     });

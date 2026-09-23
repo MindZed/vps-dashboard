@@ -43,34 +43,41 @@ export default function ConnectionCard({ data, onClose }: ConnectionCardProps) {
     {
       id: "dokploy",
       label: "Dokploy Internal",
+      portBadge: "5432",
       icon: Server,
       url: data.connections.dokploy_internal,
-      desc: "For microservices deployed inside the Docker Swarm network on Oracle VPS.",
+      desc: "For microservices deployed inside the Docker Swarm network on Oracle VPS (direct internal port 5432).",
       helperCmd: null,
+      tip: "Use for Dokploy backend containers and microservices on the internal Docker network.",
     },
     {
       id: "ssh",
       label: "Local SSH Tunnel",
+      portBadge: "5433",
       icon: Terminal,
       url: data.connections.ssh_tunnel,
-      desc: "Connect local GUI tools (DBeaver, TablePlus, pgAdmin) through an encrypted SSH tunnel.",
+      desc: "Connect local GUI tools (DBeaver, TablePlus, pgAdmin) securely through an encrypted SSH tunnel.",
       helperCmd: `ssh -L 5433:postgres-databases-sharedpostgres-kooq42:5432 opc@129.154.34.1`,
+      tip: "Run the command below in your local terminal to forward port 5433 securely to your workstation.",
     },
     {
       id: "external",
-      label: "External / Vercel",
+      label: "Pooled / Vercel (PgBouncer)",
+      portBadge: "6432",
       icon: Globe,
       url: data.connections.external_vercel,
-      desc: "For serverless deployments on Vercel, AWS Lambda, or Prisma ORM migrations.",
+      desc: "Connect serverless apps (Vercel, Next.js, AWS Lambda, Prisma) through high-performance PgBouncer on port 6432.",
       helperCmd: null,
+      tip: "PgBouncer reuses connections in transaction pooling mode. Direct port 5432 is blocked externally for security.",
     },
   ] as const;
 
   const currentTab = tabs.find((t) => t.id === activeTab) || tabs[0];
 
-  const envBlock = `# MindZed PostgreSQL (${data.database})
+  const envBlock = `# MindZed PostgreSQL (${data.database}) - ${currentTab.label}
 DATABASE_URL="${currentTab.url}"
 PG_HOST="${currentTab.id === 'dokploy' ? 'postgres-databases-sharedpostgres-kooq42' : currentTab.id === 'ssh' ? 'localhost' : '129.154.34.1'}"
+PG_PORT="${currentTab.portBadge}"
 PG_USER="${data.username}"
 PG_PASSWORD="${data.password}"
 PG_DATABASE="${data.database}"
@@ -145,7 +152,7 @@ PG_DATABASE="${data.database}"
           </div>
 
           {/* Tab Navigation */}
-          <div className="flex items-center gap-1 border-b border-zinc-800 pb-2 mb-3">
+          <div className="flex items-center gap-1 border-b border-zinc-800 pb-2 mb-3 overflow-x-auto">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -153,7 +160,7 @@ PG_DATABASE="${data.database}"
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer whitespace-nowrap ${
                     isActive
                       ? "bg-zinc-800 text-white border border-zinc-700 shadow-sm"
                       : "text-zinc-400 hover:text-white hover:bg-zinc-850"
@@ -161,6 +168,11 @@ PG_DATABASE="${data.database}"
                 >
                   <Icon className={`h-3.5 w-3.5 ${isActive ? "text-emerald-400" : "text-zinc-500"}`} />
                   <span>{tab.label}</span>
+                  <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded ${
+                    isActive ? "bg-emerald-500/20 text-emerald-300 font-semibold" : "bg-zinc-800/80 text-zinc-500"
+                  }`}>
+                    {tab.portBadge}
+                  </span>
                 </button>
               );
             })}
@@ -168,7 +180,17 @@ PG_DATABASE="${data.database}"
 
           {/* Tab Content */}
           <div className="space-y-3">
-            <p className="text-xs text-zinc-400">{currentTab.desc}</p>
+            <div className="flex items-center justify-between text-xs text-zinc-400">
+              <p>{currentTab.desc}</p>
+            </div>
+
+            {/* Tip pill */}
+            {currentTab.tip && (
+              <div className="px-3 py-1.5 rounded-lg bg-zinc-900/80 border border-zinc-800/80 text-[11px] text-zinc-400 flex items-center gap-2 font-mono">
+                <span className="text-emerald-400 font-bold">INFO:</span>
+                <span>{currentTab.tip}</span>
+              </div>
+            )}
 
             {/* Connection URL Code Block */}
             <div className="relative rounded-xl bg-zinc-950 border border-zinc-800 p-3.5 font-mono text-xs text-zinc-200 break-all select-all flex items-center justify-between gap-3">
