@@ -140,23 +140,42 @@ const DEFAULT_AGENT_SECRET = "dfb2bd78acdzfdxarf379161b46bd31e0890610fab9028x1";
 export function getAgentConfig() {
   if (typeof window !== "undefined") {
     const savedUrl = localStorage.getItem("mindzed_agent_url");
-    const savedSecret = localStorage.getItem("mindzed_agent_secret");
     const savedMode = localStorage.getItem("mindzed_demo_mode");
 
     return {
       baseUrl: savedUrl || process.env.NEXT_PUBLIC_AGENT_URL || "https://agent.mindzed.tech",
-      secret: savedSecret || process.env.NEXT_PUBLIC_AGENT_SECRET || DEFAULT_AGENT_SECRET,
+      secret: "protected-server-env",
       forceDemo: savedMode === "true",
-      hasCustomKey: Boolean(savedSecret || process.env.NEXT_PUBLIC_AGENT_SECRET || DEFAULT_AGENT_SECRET),
+      hasCustomKey: true,
     };
   }
 
   return {
-    baseUrl: process.env.NEXT_PUBLIC_AGENT_URL || "https://agent.mindzed.tech",
+    baseUrl: process.env.AGENT_URL || process.env.NEXT_PUBLIC_AGENT_URL || "https://agent.mindzed.tech",
     secret: process.env.AGENT_SECRET || process.env.NEXT_PUBLIC_AGENT_SECRET || DEFAULT_AGENT_SECRET,
     forceDemo: false,
-    hasCustomKey: Boolean(process.env.AGENT_SECRET || process.env.NEXT_PUBLIC_AGENT_SECRET || DEFAULT_AGENT_SECRET),
+    hasCustomKey: true,
   };
+}
+
+function getApiEndpoint(path: string): string {
+  if (typeof window !== "undefined") {
+    // In browser, route through secure Next.js server proxy
+    return `/api/proxy/${path}`;
+  }
+  const baseUrl = process.env.AGENT_URL || process.env.NEXT_PUBLIC_AGENT_URL || "https://agent.mindzed.tech";
+  return `${baseUrl}/api/v1/${path}`;
+}
+
+function getHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  const headers: Record<string, string> = {
+    Accept: "application/json",
+    ...extra,
+  };
+  if (typeof window === "undefined") {
+    headers["X-Agent-Secret"] = process.env.AGENT_SECRET || process.env.NEXT_PUBLIC_AGENT_SECRET || DEFAULT_AGENT_SECRET;
+  }
+  return headers;
 }
 
 export async function checkAgentHealth(): Promise<{
@@ -182,9 +201,11 @@ export async function checkAgentHealth(): Promise<{
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 4000);
 
-    const res = await fetch(`${config.baseUrl}/health`, {
+    const url = typeof window !== "undefined" ? "/api/proxy-health" : `${config.baseUrl}/health`;
+    const res = await fetch(url, {
       signal: controller.signal,
       headers: { Accept: "application/json" },
+      cache: "no-store",
     });
     clearTimeout(timeoutId);
 
@@ -197,7 +218,7 @@ export async function checkAgentHealth(): Promise<{
     return {
       ok: true,
       status: data.status || "ok",
-      latencyMs,
+      latencyMs: data.latencyMs || latencyMs,
       postgres: data.postgres || "connected",
       isMock: false,
     };
@@ -215,17 +236,15 @@ export async function checkAgentHealth(): Promise<{
 export async function fetchSystemVitals(): Promise<{ vitals: SystemVitals; isMock: boolean }> {
   const config = getAgentConfig();
 
-  if (!config.forceDemo && config.secret) {
+  if (!config.forceDemo) {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 4000);
 
-      const res = await fetch(`${config.baseUrl}/api/v1/system/vitals`, {
+      const res = await fetch(getApiEndpoint("system/vitals"), {
         signal: controller.signal,
-        headers: {
-          "X-Agent-Secret": config.secret,
-          Accept: "application/json",
-        },
+        headers: getHeaders(),
+        cache: "no-store",
       });
       clearTimeout(timeoutId);
 
@@ -262,17 +281,15 @@ export async function fetchSystemVitals(): Promise<{ vitals: SystemVitals; isMoc
 export async function fetchNetworkPorts(): Promise<{ data: NetworkPortsResponse; isMock: boolean }> {
   const config = getAgentConfig();
 
-  if (!config.forceDemo && config.secret) {
+  if (!config.forceDemo) {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 4000);
 
-      const res = await fetch(`${config.baseUrl}/api/v1/system/network/ports`, {
+      const res = await fetch(getApiEndpoint("system/network/ports"), {
         signal: controller.signal,
-        headers: {
-          "X-Agent-Secret": config.secret,
-          Accept: "application/json",
-        },
+        headers: getHeaders(),
+        cache: "no-store",
       });
       clearTimeout(timeoutId);
 
@@ -319,17 +336,15 @@ export async function fetchDatabases(): Promise<{
 }> {
   const config = getAgentConfig();
 
-  if (!config.forceDemo && config.secret) {
+  if (!config.forceDemo) {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 4000);
 
-      const res = await fetch(`${config.baseUrl}/api/v1/databases`, {
+      const res = await fetch(getApiEndpoint("databases"), {
         signal: controller.signal,
-        headers: {
-          "X-Agent-Secret": config.secret,
-          Accept: "application/json",
-        },
+        headers: getHeaders(),
+        cache: "no-store",
       });
       clearTimeout(timeoutId);
 
@@ -363,15 +378,11 @@ export async function createDatabaseApi(
 ): Promise<{ data: CreateDatabaseResponse; isMock: boolean }> {
   const config = getAgentConfig();
 
-  if (!config.forceDemo && config.secret) {
+  if (!config.forceDemo) {
     try {
-      const res = await fetch(`${config.baseUrl}/api/v1/databases`, {
+      const res = await fetch(getApiEndpoint("databases"), {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Agent-Secret": config.secret,
-          Accept: "application/json",
-        },
+        headers: getHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify(req),
       });
 
@@ -425,14 +436,11 @@ export async function createDatabaseApi(
 export async function deleteDatabaseApi(name: string): Promise<{ success: boolean; isMock: boolean }> {
   const config = getAgentConfig();
 
-  if (!config.forceDemo && config.secret) {
+  if (!config.forceDemo) {
     try {
-      const res = await fetch(`${config.baseUrl}/api/v1/databases/${encodeURIComponent(name)}`, {
+      const res = await fetch(getApiEndpoint(`databases/${encodeURIComponent(name)}`), {
         method: "DELETE",
-        headers: {
-          "X-Agent-Secret": config.secret,
-          Accept: "application/json",
-        },
+        headers: getHeaders(),
       });
 
       if (res.ok) {
@@ -459,13 +467,11 @@ export async function deleteDatabaseApi(name: string): Promise<{ success: boolea
 export async function fetchWhitelist(): Promise<WhitelistResponse> {
   const config = getAgentConfig();
 
-  if (!config.forceDemo && config.secret) {
+  if (!config.forceDemo) {
     try {
-      const res = await fetch(`${config.baseUrl}/api/v1/auth/whitelist`, {
-        headers: {
-          "X-Agent-Secret": config.secret,
-          Accept: "application/json",
-        },
+      const res = await fetch(getApiEndpoint("auth/whitelist"), {
+        headers: getHeaders(),
+        cache: "no-store",
       });
       if (res.ok) {
         const data = await res.json();
@@ -487,15 +493,11 @@ export async function fetchWhitelist(): Promise<WhitelistResponse> {
 export async function claimAdmin(username: string): Promise<{ success: boolean; error?: string }> {
   const config = getAgentConfig();
 
-  if (!config.forceDemo && config.secret) {
+  if (!config.forceDemo) {
     try {
-      const res = await fetch(`${config.baseUrl}/api/v1/auth/whitelist/claim`, {
+      const res = await fetch(getApiEndpoint("auth/whitelist/claim"), {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Agent-Secret": config.secret,
-          Accept: "application/json",
-        },
+        headers: getHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ username }),
       });
       if (res.ok) {
@@ -521,15 +523,11 @@ export async function claimAdmin(username: string): Promise<{ success: boolean; 
 export async function addWhitelistUser(username: string, role = "member"): Promise<{ success: boolean; error?: string }> {
   const config = getAgentConfig();
 
-  if (!config.forceDemo && config.secret) {
+  if (!config.forceDemo) {
     try {
-      const res = await fetch(`${config.baseUrl}/api/v1/auth/whitelist`, {
+      const res = await fetch(getApiEndpoint("auth/whitelist"), {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Agent-Secret": config.secret,
-          Accept: "application/json",
-        },
+        headers: getHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ username, role }),
       });
       if (res.ok) {
@@ -554,14 +552,11 @@ export async function addWhitelistUser(username: string, role = "member"): Promi
 export async function removeWhitelistUser(username: string): Promise<{ success: boolean; error?: string }> {
   const config = getAgentConfig();
 
-  if (!config.forceDemo && config.secret) {
+  if (!config.forceDemo) {
     try {
-      const res = await fetch(`${config.baseUrl}/api/v1/auth/whitelist/${encodeURIComponent(username)}`, {
+      const res = await fetch(getApiEndpoint(`auth/whitelist/${encodeURIComponent(username)}`), {
         method: "DELETE",
-        headers: {
-          "X-Agent-Secret": config.secret,
-          Accept: "application/json",
-        },
+        headers: getHeaders(),
       });
       if (res.ok) {
         return { success: true };

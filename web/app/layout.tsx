@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
+import SessionProvider from "@/components/SessionProvider";
 
 export const metadata: Metadata = {
   title: "MindZed Hub | Oracle VPS Vitals & Neon-Style DB Cloud",
@@ -31,14 +32,16 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
       </head>
       <body className="min-h-full flex flex-col bg-[#09090b] text-zinc-100 bg-grid-pattern">
-        {/* Subtle monochrome ambient light */}
-        <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[800px] h-[200px] bg-white/[0.02] blur-3xl pointer-events-none -z-10" />
+        <SessionProvider>
+          {/* Subtle monochrome ambient light */}
+          <div className="fixed top-0 left-1/2 -translate-x-1/2 w-[800px] h-[200px] bg-white/[0.02] blur-3xl pointer-events-none -z-10" />
 
-        <Navbar />
+          <Navbar />
 
-        <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-          {children}
-        </main>
+          <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+            {children}
+          </main>
+        </SessionProvider>
 
         <footer className="border-t border-zinc-850/80 bg-zinc-950/60 py-6 mt-12 text-xs text-zinc-500">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
