@@ -19,23 +19,28 @@ import (
 	"github.com/mindzed/mindzed-agent/handler"
 )
 
-// sanitizeDatabaseURL properly URL-encodes passwords that contain special characters like '@'
+// sanitizeDatabaseURL cleans connection strings, strips quotes, URL-encodes special characters in passwords, and ensures sslmode=disable
 func sanitizeDatabaseURL(raw string) string {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return raw
+	raw = strings.Trim(strings.TrimSpace(raw), "\"'`\r\n\t")
+	if raw == "" || strings.EqualFold(raw, "none") || strings.EqualFold(raw, "false") || strings.EqualFold(raw, "disabled") {
+		return ""
+	}
+
+	// Auto-prepend postgres:// if missing
+	if !strings.HasPrefix(raw, "postgres://") && !strings.HasPrefix(raw, "postgresql://") {
+		raw = "postgres://" + raw
 	}
 
 	schemaIdx := strings.Index(raw, "://")
 	if schemaIdx == -1 {
-		return raw
+		return ""
 	}
 	schema := raw[:schemaIdx+3]
 	remainder := raw[schemaIdx+3:]
 
 	lastAtIdx := strings.LastIndex(remainder, "@")
 	if lastAtIdx == -1 {
-		return raw
+		return ""
 	}
 
 	userPass := remainder[:lastAtIdx]
@@ -43,17 +48,38 @@ func sanitizeDatabaseURL(raw string) string {
 
 	colonIdx := strings.Index(userPass, ":")
 	if colonIdx == -1 {
-		return raw
+		return ""
 	}
 
 	user := userPass[:colonIdx]
 	pass := userPass[colonIdx+1:]
 
-	// URL-escape password if unescaped
+	// Unescape first if user already put %40, then escape properly to prevent double-encoding
+	if unescaped, err := url.QueryUnescape(pass); err == nil {
+		pass = unescaped
+	}
 	escapedPass := url.QueryEscape(pass)
 	escapedPass = strings.ReplaceAll(escapedPass, "+", "%20")
 
+	// Ensure sslmode parameter exists for internal Docker connections
+	if !strings.Contains(hostDb, "sslmode=") {
+		if strings.Contains(hostDb, "?") {
+			hostDb += "&sslmode=disable"
+		} else {
+			hostDb += "?sslmode=disable"
+		}
+	}
+
 	return fmt.Sprintf("%s%s:%s@%s", schema, user, escapedPass, hostDb)
+}
+
+// maskDatabaseURL redacts credentials from database URL for secure logging
+func maskDatabaseURL(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return "(masked-url)"
+	}
+	return u.Redacted()
 }
 
 func main() {
@@ -77,11 +103,13 @@ func main() {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
-	// 3. PostgreSQL Connection Pool
-	pgConnString := os.Getenv("DATABASE_URL")
-	if pgConnString != "" {
-		pgConnString = sanitizeDatabaseURL(pgConnString)
-	} else {
+	// 3. PostgreSQL Connection Pool (Optional - Whitelist is persisted to JSON file)
+	rawDBUrl := os.Getenv("DATABASE_URL")
+	pgConnString := ""
+
+	if rawDBUrl != "" {
+		pgConnString = sanitizeDatabaseURL(rawDBUrl)
+	} else if os.Getenv("PG_PASSWORD") != "" {
 		pgHost := os.Getenv("PG_HOST")
 		if pgHost == "" {
 			pgHost = "postgres-databases-sharedpostgres-kooq42"
@@ -110,18 +138,23 @@ func main() {
 			pgUser, escapedPass, pgHost, pgPort, pgDB, pgSSL)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
 	var pool *pgxpool.Pool
-	var err error
-	pool, err = pgxpool.New(ctx, pgConnString)
-	if err != nil {
-		log.Printf("[WARN] Initial PostgreSQL connection pool creation failed: %v", err)
-	} else if err := pool.Ping(ctx); err != nil {
-		log.Printf("[WARN] PostgreSQL ping failed: %v (daemon will run, vitals available)", err)
+	if pgConnString != "" {
+		log.Printf("[INFO] Attempting PostgreSQL connection to: %s", maskDatabaseURL(pgConnString))
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		var err error
+		pool, err = pgxpool.New(ctx, pgConnString)
+		if err != nil {
+			log.Printf("[WARN] Initial PostgreSQL connection pool creation failed: %v", err)
+		} else if err := pool.Ping(ctx); err != nil {
+			log.Printf("[WARN] PostgreSQL ping failed: %v (daemon will run, vitals available)", err)
+		} else {
+			log.Printf("[INFO] Connected successfully to PostgreSQL at %s", maskDatabaseURL(pgConnString))
+		}
 	} else {
-		log.Printf("[INFO] Connected successfully to PostgreSQL at %s", pgConnString)
+		log.Println("[INFO] PostgreSQL not configured. MindZed Agent running in vitals-only mode (whitelist stored in JSON).")
 	}
 
 	dbManager := handler.NewDBManager(pool)
