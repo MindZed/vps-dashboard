@@ -158,6 +158,7 @@ func main() {
 	}
 
 	dbManager := handler.NewDBManager(pool)
+	explorerManager := handler.NewExplorerManager(pgConnString)
 
 	// 4. Gin Router Setup
 	r := gin.New()
@@ -236,6 +237,16 @@ func main() {
 		v1.POST("/databases", dbManager.CreateDatabase)
 		v1.DELETE("/databases/:name", dbManager.DeleteDatabase)
 		v1.POST("/databases/:name/reset-password", dbManager.ResetDatabasePassword)
+
+		// Neon & Supabase-style Database Explorer & SQL Console
+		v1.GET("/explorer/tables", explorerManager.ListTables)
+		v1.GET("/explorer/schema", explorerManager.GetTableSchema)
+		v1.POST("/explorer/rows", explorerManager.GetRows)
+		v1.POST("/explorer/insert", explorerManager.InsertRow)
+		v1.PATCH("/explorer/update", explorerManager.UpdateRow)
+		v1.POST("/explorer/delete", explorerManager.DeleteRows)
+		v1.POST("/explorer/create-table", explorerManager.CreateTable)
+		v1.POST("/explorer/query", explorerManager.ExecuteQuery)
 
 		// GitHub Whitelist & First-User Admin Management
 		v1.GET("/auth/whitelist", dbManager.GetWhitelist)

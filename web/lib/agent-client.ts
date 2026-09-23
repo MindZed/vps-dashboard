@@ -644,3 +644,398 @@ export async function removeWhitelistUser(username: string): Promise<{ success: 
   mockWhitelist = mockWhitelist.filter((u) => u.username.toLowerCase() !== username.toLowerCase());
   return { success: true };
 }
+
+// ==========================================
+// Neon & Supabase-style Database Explorer APIs
+// ==========================================
+
+export interface ExplorerTable {
+  name: string;
+  schema: string;
+  estimated_rows: number;
+  size_bytes: number;
+}
+
+export interface ExplorerColumn {
+  name: string;
+  data_type: string;
+  udt_name: string;
+  is_nullable: boolean;
+  default_value: string;
+  is_primary_key: boolean;
+}
+
+export interface ExplorerIndex {
+  name: string;
+  definition: string;
+}
+
+export interface FilterRule {
+  column: string;
+  operator: "eq" | "neq" | "gt" | "lt" | "gte" | "lte" | "contains" | "is_null" | "is_not_null";
+  value: string;
+}
+
+export interface GetRowsOptions {
+  page?: number;
+  limit?: number;
+  sort_column?: string;
+  sort_order?: "asc" | "desc";
+  search?: string;
+  filters?: FilterRule[];
+}
+
+export interface GetRowsResponse {
+  database: string;
+  table: string;
+  page: number;
+  limit: number;
+  total_count: number;
+  columns: string[];
+  rows: Record<string, any>[];
+}
+
+export interface ColumnSpec {
+  name: string;
+  type: string;
+  is_primary_key?: boolean;
+  is_nullable?: boolean;
+  default_value?: string;
+}
+
+export interface SqlQueryResponse {
+  success: boolean;
+  columns?: string[];
+  rows?: Record<string, any>[];
+  row_count?: number;
+  rows_affected?: number;
+  duration_ms: number;
+  message?: string;
+  error?: string;
+}
+
+// Mock state for Explorer demo fallback
+const mockExplorerTables: Record<string, ExplorerTable[]> = {
+  db_student_erp_dev: [
+    { name: "students", schema: "public", estimated_rows: 12, size_bytes: 32768 },
+    { name: "courses", schema: "public", estimated_rows: 5, size_bytes: 16384 },
+    { name: "enrollments", schema: "public", estimated_rows: 24, size_bytes: 49152 },
+  ],
+  db_testing_dev: [
+    { name: "users", schema: "public", estimated_rows: 8, size_bytes: 24576 },
+    { name: "audit_logs", schema: "public", estimated_rows: 45, size_bytes: 65536 },
+  ],
+};
+
+const mockExplorerColumns: Record<string, ExplorerColumn[]> = {
+  students: [
+    { name: "id", data_type: "uuid", udt_name: "uuid", is_nullable: false, default_value: "gen_random_uuid()", is_primary_key: true },
+    { name: "full_name", data_type: "character varying", udt_name: "varchar", is_nullable: false, default_value: "", is_primary_key: false },
+    { name: "roll_number", data_type: "integer", udt_name: "int4", is_nullable: false, default_value: "", is_primary_key: false },
+    { name: "is_active", data_type: "boolean", udt_name: "bool", is_nullable: false, default_value: "true", is_primary_key: false },
+    { name: "metadata", data_type: "jsonb", udt_name: "jsonb", is_nullable: true, default_value: "'{}'::jsonb", is_primary_key: false },
+    { name: "created_at", data_type: "timestamp with time zone", udt_name: "timestamptz", is_nullable: false, default_value: "now()", is_primary_key: false },
+  ],
+  users: [
+    { name: "id", data_type: "uuid", udt_name: "uuid", is_nullable: false, default_value: "gen_random_uuid()", is_primary_key: true },
+    { name: "email", data_type: "character varying", udt_name: "varchar", is_nullable: false, default_value: "", is_primary_key: false },
+    { name: "role", data_type: "character varying", udt_name: "varchar", is_nullable: false, default_value: "'member'", is_primary_key: false },
+    { name: "is_active", data_type: "boolean", udt_name: "bool", is_nullable: false, default_value: "true", is_primary_key: false },
+    { name: "created_at", data_type: "timestamp with time zone", udt_name: "timestamptz", is_nullable: false, default_value: "now()", is_primary_key: false },
+  ],
+};
+
+const mockExplorerRows: Record<string, Record<string, any>[]> = {
+  students: [
+    { id: "e58ed763-928c-4155-bee9-fdbaaadc15f3", full_name: "Aarav Sharma", roll_number: 101, is_active: true, metadata: { section: "A", gpa: 3.9 }, created_at: "2026-09-20T10:15:30Z" },
+    { id: "a71f0345-4231-482a-9cb8-6f917531d044", full_name: "Diya Patel", roll_number: 102, is_active: true, metadata: { section: "A", gpa: 3.8 }, created_at: "2026-09-21T11:20:00Z" },
+    { id: "c384a821-2a10-48e3-b4e8-8a8b19ff5621", full_name: "Rohan Verma", roll_number: 103, is_active: false, metadata: { section: "B", gpa: 3.2 }, created_at: "2026-09-22T09:40:15Z" },
+  ],
+  users: [
+    { id: "b21a8f90-1123-4567-890a-bcdef0123456", email: "admin@mindzed.tech", role: "admin", is_active: true, created_at: "2026-09-23T14:00:00Z" },
+    { id: "c34b9a01-2234-5678-901b-cdef01234567", email: "dev@mindzed.tech", role: "developer", is_active: true, created_at: "2026-09-23T15:30:00Z" },
+  ],
+};
+
+export async function fetchTables(database: string): Promise<ExplorerTable[]> {
+  const config = getAgentConfig();
+  if (!config.forceDemo) {
+    try {
+      const res = await fetch(getApiEndpoint(`explorer/tables?db=${encodeURIComponent(database)}`), {
+        headers: getHeaders(),
+        cache: "no-store",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return data.tables || [];
+      }
+    } catch {
+      // Fall through to mock
+    }
+  }
+  return mockExplorerTables[database] || [
+    { name: "items", schema: "public", estimated_rows: 0, size_bytes: 8192 },
+  ];
+}
+
+export async function fetchTableSchema(
+  database: string,
+  table: string
+): Promise<{ columns: ExplorerColumn[]; indexes: ExplorerIndex[] }> {
+  const config = getAgentConfig();
+  if (!config.forceDemo) {
+    try {
+      const res = await fetch(
+        getApiEndpoint(`explorer/schema?db=${encodeURIComponent(database)}&table=${encodeURIComponent(table)}`),
+        {
+          headers: getHeaders(),
+          cache: "no-store",
+        }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        return {
+          columns: data.columns || [],
+          indexes: data.indexes || [],
+        };
+      }
+    } catch {
+      // Fall through to mock
+    }
+  }
+
+  const cols = mockExplorerColumns[table] || [
+    { name: "id", data_type: "uuid", udt_name: "uuid", is_nullable: false, default_value: "gen_random_uuid()", is_primary_key: true },
+    { name: "name", data_type: "text", udt_name: "text", is_nullable: false, default_value: "", is_primary_key: false },
+    { name: "created_at", data_type: "timestamptz", udt_name: "timestamptz", is_nullable: false, default_value: "now()", is_primary_key: false },
+  ];
+  return { columns: cols, indexes: [] };
+}
+
+export async function fetchTableRows(
+  database: string,
+  table: string,
+  options: GetRowsOptions = {}
+): Promise<GetRowsResponse> {
+  const config = getAgentConfig();
+  if (!config.forceDemo) {
+    try {
+      const res = await fetch(
+        getApiEndpoint(`explorer/rows?db=${encodeURIComponent(database)}&table=${encodeURIComponent(table)}`),
+        {
+          method: "POST",
+          headers: getHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify(options),
+          cache: "no-store",
+        }
+      );
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch {
+      // Fall through to mock
+    }
+  }
+
+  const rows = mockExplorerRows[table] || [];
+  return {
+    database,
+    table,
+    page: options.page || 1,
+    limit: options.limit || 50,
+    total_count: rows.length,
+    columns: rows.length > 0 ? Object.keys(rows[0]) : ["id", "name", "created_at"],
+    rows,
+  };
+}
+
+export async function insertTableRow(
+  database: string,
+  table: string,
+  record: Record<string, any>
+): Promise<{ success: boolean; record?: Record<string, any>; error?: string }> {
+  const config = getAgentConfig();
+  if (!config.forceDemo) {
+    try {
+      const res = await fetch(
+        getApiEndpoint(`explorer/insert?db=${encodeURIComponent(database)}&table=${encodeURIComponent(table)}`),
+        {
+          method: "POST",
+          headers: getHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify({ record }),
+        }
+      );
+      const data = await res.json();
+      if (res.ok) {
+        return { success: true, record: data.record };
+      }
+      return { success: false, error: data.error || "Failed to insert record" };
+    } catch (e: unknown) {
+      return { success: false, error: e instanceof Error ? e.message : String(e) };
+    }
+  }
+
+  const mockNew = { id: `mock-${Date.now()}`, ...record };
+  if (!mockExplorerRows[table]) mockExplorerRows[table] = [];
+  mockExplorerRows[table].unshift(mockNew);
+  return { success: true, record: mockNew };
+}
+
+export async function updateTableRow(
+  database: string,
+  table: string,
+  pkColumn: string,
+  pkValue: any,
+  updates: Record<string, any>
+): Promise<{ success: boolean; record?: Record<string, any>; error?: string }> {
+  const config = getAgentConfig();
+  if (!config.forceDemo) {
+    try {
+      const res = await fetch(
+        getApiEndpoint(`explorer/update?db=${encodeURIComponent(database)}&table=${encodeURIComponent(table)}`),
+        {
+          method: "PATCH",
+          headers: getHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify({ pk_column: pkColumn, pk_value: pkValue, updates }),
+        }
+      );
+      const data = await res.json();
+      if (res.ok) {
+        return { success: true, record: data.record };
+      }
+      return { success: false, error: data.error || "Failed to update record" };
+    } catch (e: unknown) {
+      return { success: false, error: e instanceof Error ? e.message : String(e) };
+    }
+  }
+
+  if (mockExplorerRows[table]) {
+    const idx = mockExplorerRows[table].findIndex((r) => r[pkColumn] === pkValue);
+    if (idx !== -1) {
+      mockExplorerRows[table][idx] = { ...mockExplorerRows[table][idx], ...updates };
+      return { success: true, record: mockExplorerRows[table][idx] };
+    }
+  }
+  return { success: true };
+}
+
+export async function deleteTableRows(
+  database: string,
+  table: string,
+  pkColumn: string,
+  pkValues: any[]
+): Promise<{ success: boolean; deleted_count?: number; error?: string }> {
+  const config = getAgentConfig();
+  if (!config.forceDemo) {
+    try {
+      const res = await fetch(
+        getApiEndpoint(`explorer/delete?db=${encodeURIComponent(database)}&table=${encodeURIComponent(table)}`),
+        {
+          method: "POST",
+          headers: getHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify({ pk_column: pkColumn, pk_values: pkValues }),
+        }
+      );
+      const data = await res.json();
+      if (res.ok) {
+        return { success: true, deleted_count: data.deleted_count };
+      }
+      return { success: false, error: data.error || "Failed to delete records" };
+    } catch (e: unknown) {
+      return { success: false, error: e instanceof Error ? e.message : String(e) };
+    }
+  }
+
+  if (mockExplorerRows[table]) {
+    const set = new Set(pkValues);
+    mockExplorerRows[table] = mockExplorerRows[table].filter((r) => !set.has(r[pkColumn]));
+  }
+  return { success: true, deleted_count: pkValues.length };
+}
+
+export async function createTableVisual(
+  database: string,
+  tableName: string,
+  columns: ColumnSpec[]
+): Promise<{ success: boolean; message?: string; error?: string }> {
+  const config = getAgentConfig();
+  if (!config.forceDemo) {
+    try {
+      const res = await fetch(
+        getApiEndpoint(`explorer/create-table?db=${encodeURIComponent(database)}`),
+        {
+          method: "POST",
+          headers: getHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify({ table_name: tableName, columns }),
+        }
+      );
+      const data = await res.json();
+      if (res.ok) {
+        return { success: true, message: data.message };
+      }
+      return { success: false, error: data.error || "Failed to create table" };
+    } catch (e: unknown) {
+      return { success: false, error: e instanceof Error ? e.message : String(e) };
+    }
+  }
+
+  if (!mockExplorerTables[database]) mockExplorerTables[database] = [];
+  mockExplorerTables[database].push({
+    name: tableName,
+    schema: "public",
+    estimated_rows: 0,
+    size_bytes: 8192,
+  });
+  return { success: true, message: `Table '${tableName}' created successfully` };
+}
+
+export async function executeSqlQuery(
+  database: string,
+  sql: string
+): Promise<SqlQueryResponse> {
+  const config = getAgentConfig();
+  if (!config.forceDemo) {
+    try {
+      const res = await fetch(
+        getApiEndpoint(`explorer/query?db=${encodeURIComponent(database)}`),
+        {
+          method: "POST",
+          headers: getHeaders({ "Content-Type": "application/json" }),
+          body: JSON.stringify({ sql }),
+        }
+      );
+      const data = await res.json();
+      if (res.ok) {
+        return {
+          success: true,
+          columns: data.columns,
+          rows: data.rows,
+          row_count: data.row_count,
+          rows_affected: data.rows_affected,
+          duration_ms: data.duration_ms || 0,
+          message: data.message,
+        };
+      }
+      return {
+        success: false,
+        duration_ms: data.duration_ms || 0,
+        error: data.error || "Query failed",
+      };
+    } catch (e: unknown) {
+      return {
+        success: false,
+        duration_ms: 0,
+        error: e instanceof Error ? e.message : String(e),
+      };
+    }
+  }
+
+  return {
+    success: true,
+    columns: ["sample_col_1", "sample_col_2"],
+    rows: [{ sample_col_1: "Hello", sample_col_2: "World" }],
+    row_count: 1,
+    duration_ms: 1.4,
+    message: "Executed in mock mode",
+  };
+}

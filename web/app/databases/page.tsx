@@ -2,8 +2,10 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import Link from "next/link";
 import { 
   Database, 
+  Table,
   Plus, 
   Search, 
   Trash2, 
@@ -394,6 +396,15 @@ export default function DatabasesPage() {
                       {/* Actions */}
                       <td className="px-5 py-3.5 text-right">
                         <div className="flex items-center justify-end gap-2">
+                          <Link
+                            href={`/databases/${encodeURIComponent(db.name)}`}
+                            className="px-2.5 py-1 rounded-lg text-xs font-sans font-medium text-emerald-300 hover:text-emerald-200 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm"
+                            title="Open Supabase/Neon-style Table Explorer & SQL Studio"
+                          >
+                            <Table className="h-3 w-3" />
+                            <span>Studio</span>
+                          </Link>
+
                           <button
                             onClick={() => handleOpenExistingConnection(db)}
                             className="px-2.5 py-1 rounded-lg text-xs font-sans font-medium text-zinc-200 hover:text-white bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 transition-colors flex items-center gap-1.5 cursor-pointer"
