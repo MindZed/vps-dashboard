@@ -21,7 +21,7 @@ export default function StatusPage() {
   }, []);
 
   return (
-    <div className="space-y-6 sm:space-y-8 animate-in fade-in duration-200">
+    <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 sm:space-y-8 animate-in fade-in duration-200">
       {/* Header Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-zinc-800">
         <div>

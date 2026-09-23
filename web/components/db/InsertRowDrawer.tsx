@@ -156,10 +156,10 @@ export default function InsertRowDrawer({
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "spring", damping: 28, stiffness: 280 }}
-            className="w-screen max-w-xl pointer-events-auto bg-[#0F172A] border-l border-white/10 shadow-2xl flex flex-col"
+            className="w-screen max-w-xl pointer-events-auto bg-[#111114] border-l border-zinc-800 shadow-2xl flex flex-col text-zinc-100"
           >
             {/* Header */}
-            <div className="px-6 py-5 border-b border-white/10 flex items-center justify-between bg-[#131F37]/50">
+            <div className="px-6 py-5 border-b border-zinc-800 flex items-center justify-between bg-[#141418]">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
                   <Plus className="w-5 h-5" />
@@ -168,15 +168,15 @@ export default function InsertRowDrawer({
                   <h3 className="text-base font-semibold text-white flex items-center gap-2">
                     Insert Row into <span className="font-mono text-emerald-400">{table}</span>
                   </h3>
-                  <p className="text-xs text-slate-400">
-                    Target Database: <span className="font-mono text-slate-300">{database}</span>
+                  <p className="text-xs text-zinc-400">
+                    Target Database: <span className="font-mono text-zinc-300">{database}</span>
                   </p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={onClose}
-                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors"
+                className="p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -201,14 +201,14 @@ export default function InsertRowDrawer({
                 return (
                   <div
                     key={col.name}
-                    className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition-colors"
+                    className="p-3.5 rounded-xl bg-zinc-950/60 border border-zinc-850 hover:border-zinc-800 transition-colors"
                   >
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <label className="text-xs font-semibold text-slate-200 font-mono">
+                        <label className="text-xs font-semibold text-zinc-200 font-mono">
                           {col.name}
                         </label>
-                        <span className="px-1.5 py-0.5 text-[10px] font-mono rounded bg-slate-800 text-slate-400 border border-slate-700/50">
+                        <span className="px-1.5 py-0.5 text-[10px] font-mono rounded bg-zinc-800 text-zinc-400 border border-zinc-700/50">
                           {col.udt_name}
                         </span>
                         {isPk && (
@@ -222,6 +222,18 @@ export default function InsertRowDrawer({
                       </div>
 
                       <div className="flex items-center gap-2">
+                        {isPk && (udt === "text" || udt === "varchar") && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const cuidVal = "c" + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+                              handleValueChange(col.name, cuidVal);
+                            }}
+                            className="text-[10px] text-emerald-400 hover:text-emerald-300 flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20"
+                          >
+                            <Sparkles className="w-3 h-3" /> Gen ID
+                          </button>
+                        )}
                         {udt === "uuid" && (
                           <button
                             type="button"
@@ -256,7 +268,7 @@ export default function InsertRowDrawer({
 
                     {/* Column Input */}
                     {isNull ? (
-                      <div className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/5 text-slate-500 text-xs italic">
+                      <div className="w-full px-3 py-2 rounded-lg bg-zinc-950/80 border border-zinc-850 text-zinc-500 text-xs italic">
                         NULL (Value will be inserted as SQL NULL)
                       </div>
                     ) : udt === "bool" ? (
@@ -267,7 +279,7 @@ export default function InsertRowDrawer({
                           className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
                             rawVal === true || rawVal === "true"
                               ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300"
-                              : "bg-white/5 border-white/10 text-slate-400 hover:text-white"
+                              : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white"
                           }`}
                         >
                           TRUE
@@ -278,14 +290,14 @@ export default function InsertRowDrawer({
                           className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
                             rawVal === false || rawVal === "false"
                               ? "bg-rose-500/20 border-rose-500/40 text-rose-300"
-                              : "bg-white/5 border-white/10 text-slate-400 hover:text-white"
+                              : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-white"
                           }`}
                         >
                           FALSE
                         </button>
                         {col.default_value && (
-                          <span className="text-[11px] text-slate-500">
-                            (default: <code className="font-mono text-slate-400">{col.default_value}</code>)
+                          <span className="text-[11px] text-zinc-500">
+                            (default: <code className="font-mono text-zinc-400">{col.default_value}</code>)
                           </span>
                         )}
                       </div>
@@ -296,7 +308,7 @@ export default function InsertRowDrawer({
                           value={rawVal || ""}
                           onChange={(e) => handleValueChange(col.name, e.target.value)}
                           placeholder='{"key": "value"}'
-                          className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/10 text-xs font-mono text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500 resize-y"
+                          className="w-full px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-emerald-500 resize-y"
                         />
                       </div>
                     ) : (
@@ -313,7 +325,7 @@ export default function InsertRowDrawer({
                               ? "Auto-generated ID (or enter custom)"
                               : `Enter ${col.udt_name}...`
                           }
-                          className="w-full px-3 py-2 rounded-lg bg-black/40 border border-white/10 text-xs font-mono text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500"
+                          className="w-full px-3 py-2 rounded-lg bg-zinc-950 border border-zinc-800 text-xs font-mono text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-emerald-500"
                         />
                       </div>
                     )}
@@ -323,12 +335,12 @@ export default function InsertRowDrawer({
             </form>
 
             {/* Footer Actions */}
-            <div className="px-6 py-4 border-t border-white/10 bg-[#131F37]/50 flex items-center justify-between">
+            <div className="px-6 py-4 border-t border-zinc-800 bg-[#141418] flex items-center justify-between">
               <button
                 type="button"
                 onClick={onClose}
                 disabled={loading}
-                className="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white transition-colors"
+                className="px-4 py-2 text-xs font-medium text-zinc-400 hover:text-white transition-colors"
               >
                 Cancel
               </button>

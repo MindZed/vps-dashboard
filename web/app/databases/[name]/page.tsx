@@ -30,6 +30,9 @@ import {
   Code2,
   Loader2,
   CheckCircle2,
+  Copy,
+  Eye,
+  Pencil,
 } from "lucide-react";
 import {
   ExplorerTable,
@@ -94,6 +97,9 @@ export default function DatabaseStudioPage() {
     val: string;
   } | null>(null);
   const [savingCell, setSavingCell] = useState(false);
+  const [recentlyUpdated, setRecentlyUpdated] = useState<string | null>(null);
+  const [inspectCellData, setInspectCellData] = useState<{ column: string; val: any; pk: any } | null>(null);
+  const [isCopied, setIsCopied] = useState(false);
 
   // Modals & Drawers
   const [isNewTableModalOpen, setIsNewTableModalOpen] = useState(false);
@@ -266,7 +272,8 @@ export default function DatabaseStudioPage() {
   const handleSaveCell = async () => {
     if (!editingCell) return;
     const { pk, column, originalVal, val } = editingCell;
-    if (String(originalVal) === val) {
+    const origStr = originalVal === null || originalVal === undefined ? "" : String(originalVal);
+    if (origStr === val) {
       setEditingCell(null);
       return;
     }
@@ -278,7 +285,7 @@ export default function DatabaseStudioPage() {
       let parsedVal: any = val;
       const udt = colDef?.udt_name.toLowerCase() || "";
 
-      if (val === "" && colDef?.is_nullable) {
+      if ((val === "" || val.toUpperCase() === "NULL") && colDef?.is_nullable) {
         parsedVal = null;
       } else if (udt === "bool") {
         parsedVal = val.toLowerCase() === "true";
@@ -298,7 +305,9 @@ export default function DatabaseStudioPage() {
         setRows((prev) =>
           prev.map((r) => (r[primaryKeyCol] === pk ? { ...r, [column]: parsedVal } : r))
         );
-        showToast(`Updated '${column}'`);
+        setRecentlyUpdated(`${pk}_${column}`);
+        setTimeout(() => setRecentlyUpdated(null), 2500);
+        showToast(`Saved '${column}'`);
       } else {
         showToast(res.error || "Update failed", "error");
       }
@@ -395,198 +404,199 @@ export default function DatabaseStudioPage() {
   const totalPages = Math.ceil(totalRows / pageSize) || 1;
 
   return (
-    <div className="min-h-screen bg-[#090D16] text-slate-100 flex flex-col font-sans selection:bg-emerald-500/20 selection:text-emerald-300">
-      {/* Toast Notification */}
-      <AnimatePresence>
-        {toastMsg && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className={`fixed top-4 right-6 z-50 px-4 py-2.5 rounded-xl shadow-2xl border text-xs font-medium flex items-center gap-2 backdrop-blur-md ${
-              toastMsg.type === "error"
-                ? "bg-rose-950/80 border-rose-500/30 text-rose-200"
-                : "bg-emerald-950/80 border-emerald-500/30 text-emerald-200"
-            }`}
-          >
-            {toastMsg.type === "error" ? (
-              <AlertCircle className="w-4 h-4 text-rose-400" />
-            ) : (
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-            )}
-            <span>{toastMsg.text}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
+    <div className="w-full flex-1 flex flex-col bg-[#09090b] text-zinc-100 font-sans selection:bg-emerald-500/20 selection:text-emerald-300 px-2 sm:px-4 lg:px-6 py-3 sm:py-4">
+      {/* Master Studio Container Card */}
+      <div className="flex-1 flex flex-col rounded-2xl border border-zinc-800 bg-[#111114] shadow-2xl overflow-hidden min-h-[calc(100vh-6.5rem)]">
+        {/* Toast Notification */}
+        <AnimatePresence>
+          {toastMsg && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className={`fixed top-4 right-6 z-50 px-4 py-2.5 rounded-xl shadow-2xl border text-xs font-medium flex items-center gap-2 backdrop-blur-md ${
+                toastMsg.type === "error"
+                  ? "bg-rose-950/90 border-rose-500/30 text-rose-200"
+                  : "bg-emerald-950/90 border-emerald-500/30 text-emerald-200"
+              }`}
+            >
+              {toastMsg.type === "error" ? (
+                <AlertCircle className="w-4 h-4 text-rose-400" />
+              ) : (
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              )}
+              <span>{toastMsg.text}</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-      {/* Top Navbar (Neon / Supabase header style) */}
-      <header className="h-14 border-b border-white/10 bg-[#0C1222]/80 backdrop-blur-md px-5 flex items-center justify-between z-30 sticky top-0">
-        <div className="flex items-center gap-3">
-          <Link
-            href="/databases"
-            className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors py-1 px-2 rounded-lg hover:bg-white/5"
-          >
-            <ChevronLeft className="w-4 h-4" />
-            <span>Databases</span>
-          </Link>
-          <span className="text-slate-600">/</span>
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-md bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
-              <Database className="w-3.5 h-3.5" />
-            </div>
-            <span className="font-semibold text-sm text-white font-mono">{dbName}</span>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              v16.1 · PgBouncer Pool
-            </span>
-          </div>
-        </div>
-
-        {/* Center Tabs: Table Editor vs SQL Console */}
-        <div className="flex items-center bg-[#131C31] p-1 rounded-xl border border-white/10">
-          <button
-            onClick={() => setActiveTab("explorer")}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
-              activeTab === "explorer"
-                ? "bg-emerald-500/20 text-emerald-300 shadow-sm border border-emerald-500/30"
-                : "text-slate-400 hover:text-white"
-            }`}
-          >
-            <Table className="w-3.5 h-3.5" />
-            <span>Table Editor</span>
-          </button>
-          <button
-            onClick={() => setActiveTab("sql")}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
-              activeTab === "sql"
-                ? "bg-indigo-500/20 text-indigo-300 shadow-sm border border-indigo-500/30"
-                : "text-slate-400 hover:text-white"
-            }`}
-          >
-            <Terminal className="w-3.5 h-3.5" />
-            <span>SQL Console</span>
-          </button>
-        </div>
-
-        {/* Right Tools */}
-        <div className="flex items-center gap-2.5">
-          <button
-            onClick={handleOpenConnectionInfo}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300 bg-white/5 hover:bg-white/10 border border-white/10 transition-colors"
-          >
-            <KeyRound className="w-3.5 h-3.5 text-amber-400" />
-            <span>Connection Info</span>
-          </button>
-        </div>
-      </header>
-
-      {/* Main Studio Body: Sidebar + Workspace */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left Sidebar (Tables & Schemas) */}
-        <aside className="w-64 border-r border-white/10 bg-[#0C1222]/40 flex flex-col shrink-0">
-          {/* Sidebar Top: Action & Search */}
-          <div className="p-3 border-b border-white/10 space-y-2.5">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider font-mono">
-                Tables ({tables.length})
+        {/* Top Navbar */}
+        <header className="h-14 border-b border-zinc-800 bg-[#121216]/95 backdrop-blur-md px-5 flex items-center justify-between z-30 sticky top-0">
+          <div className="flex items-center gap-3">
+            <Link
+              href="/databases"
+              className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-white transition-colors py-1 px-2 rounded-lg hover:bg-zinc-800"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              <span>Databases</span>
+            </Link>
+            <span className="text-zinc-600">/</span>
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-md bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                <Database className="w-3.5 h-3.5" />
+              </div>
+              <span className="font-semibold text-sm text-white font-mono">{dbName}</span>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                v18.6 · PgBouncer Pool
               </span>
-              <button
-                onClick={() => setIsNewTableModalOpen(true)}
-                className="flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-medium shadow-sm transition-colors"
-              >
-                <Plus className="w-3 h-3" />
-                <span>New Table</span>
-              </button>
-            </div>
-            <div className="relative">
-              <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-2.5" />
-              <input
-                type="text"
-                placeholder="Filter tables..."
-                value={tableSearch}
-                onChange={(e) => setTableSearch(e.target.value)}
-                className="w-full pl-8 pr-2.5 py-1.5 bg-black/40 border border-white/10 rounded-lg text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-mono"
-              />
             </div>
           </div>
 
-          {/* Tables List */}
-          <div className="flex-1 overflow-y-auto p-2 space-y-1">
-            {tablesError && (
-              <div className="p-3 mb-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs space-y-1.5">
-                <div className="flex items-center gap-1.5 font-semibold text-amber-400">
-                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                  <span>Redeploy Required</span>
-                </div>
-                <p className="text-[11px] text-amber-200/80 leading-relaxed font-sans">
-                  The Go Agent hasn&apos;t loaded the explorer endpoints yet. Click <strong>Redeploy</strong> on <code>mindzed-agent</code> in Dokploy.
-                </p>
-              </div>
-            )}
+          {/* Center Tabs: Table Editor vs SQL Console */}
+          <div className="flex items-center bg-zinc-900/90 p-1 rounded-xl border border-zinc-800">
+            <button
+              onClick={() => setActiveTab("explorer")}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                activeTab === "explorer"
+                  ? "bg-zinc-800 text-emerald-300 shadow-sm border border-zinc-700"
+                  : "text-zinc-400 hover:text-white"
+              }`}
+            >
+              <Table className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Table Editor</span>
+            </button>
+            <button
+              onClick={() => setActiveTab("sql")}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                activeTab === "sql"
+                  ? "bg-zinc-800 text-indigo-300 shadow-sm border border-zinc-700"
+                  : "text-zinc-400 hover:text-white"
+              }`}
+            >
+              <Terminal className="w-3.5 h-3.5 text-indigo-400" />
+              <span>SQL Console</span>
+            </button>
+          </div>
 
-            {loadingTables ? (
-              <div className="flex items-center justify-center p-8 text-xs text-slate-500 gap-2">
-                <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />
-                <span>Reading catalogs...</span>
-              </div>
-            ) : filteredTables.length === 0 ? (
-              <div className="p-6 text-center text-xs text-slate-500">
-                <Table className="w-6 h-6 mx-auto mb-2 text-slate-600" />
-                <p>No tables found.</p>
+          {/* Right Tools */}
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={handleOpenConnectionInfo}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-300 bg-zinc-800/80 hover:bg-zinc-700/80 border border-zinc-700 transition-colors shadow-sm"
+            >
+              <KeyRound className="w-3.5 h-3.5 text-amber-400" />
+              <span>Connection Info</span>
+            </button>
+          </div>
+        </header>
+
+        {/* Main Studio Body: Sidebar + Workspace */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Left Sidebar (Tables & Schemas) */}
+          <aside className="w-64 border-r border-zinc-800 bg-[#0e0e11] flex flex-col shrink-0">
+            {/* Sidebar Top: Action & Search */}
+            <div className="p-3 border-b border-zinc-800 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider font-mono">
+                  Tables ({tables.length})
+                </span>
                 <button
                   onClick={() => setIsNewTableModalOpen(true)}
-                  className="mt-2 text-emerald-400 hover:underline"
+                  className="flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-medium shadow-sm transition-colors"
                 >
-                  Create one now
+                  <Plus className="w-3 h-3" />
+                  <span>New Table</span>
                 </button>
               </div>
-            ) : (
-              filteredTables.map((tbl) => {
-                const isSelected = selectedTable === tbl.name;
-                const sizeKb = Math.round(tbl.size_bytes / 1024);
-                return (
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-2.5" />
+                <input
+                  type="text"
+                  placeholder="Filter tables..."
+                  value={tableSearch}
+                  onChange={(e) => setTableSearch(e.target.value)}
+                  className="w-full pl-8 pr-2.5 py-1.5 bg-zinc-950/80 border border-zinc-800 rounded-lg text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-emerald-500 font-mono"
+                />
+              </div>
+            </div>
+
+            {/* Tables List */}
+            <div className="flex-1 overflow-y-auto p-2 space-y-1">
+              {tablesError && (
+                <div className="p-3 mb-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs space-y-1.5">
+                  <div className="flex items-center gap-1.5 font-semibold text-amber-400">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>Redeploy Required</span>
+                  </div>
+                  <p className="text-[11px] text-amber-200/80 leading-relaxed font-sans">
+                    The Go Agent hasn&apos;t loaded the explorer endpoints yet. Click <strong>Redeploy</strong> on <code>mindzed-agent</code> in Dokploy.
+                  </p>
+                </div>
+              )}
+
+              {loadingTables ? (
+                <div className="flex items-center justify-center p-8 text-xs text-zinc-500 gap-2">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />
+                  <span>Reading catalogs...</span>
+                </div>
+              ) : filteredTables.length === 0 ? (
+                <div className="p-6 text-center text-xs text-zinc-500">
+                  <Table className="w-6 h-6 mx-auto mb-2 text-zinc-600" />
+                  <p>No tables found.</p>
                   <button
-                    key={tbl.name}
-                    onClick={() => {
-                      setSelectedTable(tbl.name);
-                      if (activeTab !== "explorer") setActiveTab("explorer");
-                    }}
-                    className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-mono transition-all text-left group ${
-                      isSelected
-                        ? "bg-emerald-500/15 text-emerald-300 font-medium border border-emerald-500/30"
-                        : "text-slate-300 hover:bg-white/5 hover:text-white"
-                    }`}
+                    onClick={() => setIsNewTableModalOpen(true)}
+                    className="mt-2 text-emerald-400 hover:underline"
                   >
-                    <div className="flex items-center gap-2 truncate">
-                      <Table
-                        className={`w-3.5 h-3.5 shrink-0 ${
-                          isSelected ? "text-emerald-400" : "text-slate-500 group-hover:text-slate-300"
-                        }`}
-                      />
-                      <span className="truncate">{tbl.name}</span>
-                    </div>
-                    <span className="text-[10px] text-slate-500 group-hover:text-slate-400 shrink-0">
-                      {tbl.estimated_rows}
-                    </span>
+                    Create one now
                   </button>
-                );
-              })
-            )}
-          </div>
-        </aside>
+                </div>
+              ) : (
+                filteredTables.map((tbl) => {
+                  const isSelected = selectedTable === tbl.name;
+                  return (
+                    <button
+                      key={tbl.name}
+                      onClick={() => {
+                        setSelectedTable(tbl.name);
+                        if (activeTab !== "explorer") setActiveTab("explorer");
+                      }}
+                      className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-mono transition-all text-left group ${
+                        isSelected
+                          ? "bg-emerald-500/15 text-emerald-300 font-medium border border-emerald-500/30"
+                          : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-100"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <Table
+                          className={`w-3.5 h-3.5 shrink-0 ${
+                            isSelected ? "text-emerald-400" : "text-zinc-500 group-hover:text-zinc-300"
+                          }`}
+                        />
+                        <span className="truncate">{tbl.name}</span>
+                      </div>
+                      <span className="text-[10px] text-zinc-500 group-hover:text-zinc-400 shrink-0">
+                        {tbl.estimated_rows}
+                      </span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </aside>
 
         {/* Right Canvas: Workspace */}
-        <main className="flex-1 flex flex-col overflow-hidden bg-[#0A0E1A]">
+        <main className="flex-1 flex flex-col overflow-hidden bg-[#09090b]">
           {activeTab === "explorer" ? (
             /* TAB 1: TABLE EXPLORER */
             <div className="flex-1 flex flex-col overflow-hidden">
               {/* Table Toolbar */}
-              <div className="px-5 py-3 border-b border-white/10 bg-[#0C1222]/60 flex items-center justify-between gap-4">
+              <div className="px-5 py-3 border-b border-zinc-800 bg-[#111114] flex items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
                   <div>
                     <h2 className="text-sm font-semibold text-white font-mono flex items-center gap-2">
                       <span>{selectedTable || "Select a table"}</span>
                       {selectedTable && (
-                        <span className="text-[11px] font-sans font-normal text-slate-400">
+                        <span className="text-[11px] font-sans font-normal text-zinc-400">
                           ({totalRows.toLocaleString()} {totalRows === 1 ? "row" : "rows"})
                         </span>
                       )}
@@ -595,13 +605,13 @@ export default function DatabaseStudioPage() {
 
                   {/* Subview switch: Data vs Schema */}
                   {selectedTable && (
-                    <div className="flex items-center bg-black/40 p-0.5 rounded-lg border border-white/10 text-xs">
+                    <div className="flex items-center bg-zinc-950 p-0.5 rounded-lg border border-zinc-800 text-xs">
                       <button
                         onClick={() => setSubView("data")}
                         className={`px-3 py-1 rounded-md transition-colors ${
                           subView === "data"
-                            ? "bg-white/10 text-white font-medium shadow-sm"
-                            : "text-slate-400 hover:text-white"
+                            ? "bg-zinc-800 text-white font-medium shadow-sm"
+                            : "text-zinc-400 hover:text-white"
                         }`}
                       >
                         Data Grid
@@ -610,8 +620,8 @@ export default function DatabaseStudioPage() {
                         onClick={() => setSubView("schema")}
                         className={`px-3 py-1 rounded-md transition-colors ${
                           subView === "schema"
-                            ? "bg-white/10 text-white font-medium shadow-sm"
-                            : "text-slate-400 hover:text-white"
+                            ? "bg-zinc-800 text-white font-medium shadow-sm"
+                            : "text-zinc-400 hover:text-white"
                         }`}
                       >
                         Schema ({columns.length})
@@ -627,7 +637,7 @@ export default function DatabaseStudioPage() {
                       <>
                         {/* Search in table */}
                         <div className="relative">
-                          <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-2.5" />
+                          <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-2.5" />
                           <input
                             type="text"
                             placeholder="Search rows..."
@@ -639,7 +649,7 @@ export default function DatabaseStudioPage() {
                                 loadRowsData();
                               }
                             }}
-                            className="w-44 pl-8 pr-2.5 py-1.5 bg-black/40 border border-white/10 rounded-lg text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-mono"
+                            className="w-44 pl-8 pr-2.5 py-1.5 bg-zinc-950/80 border border-zinc-800 rounded-lg text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-emerald-500 font-mono"
                           />
                         </div>
 
@@ -649,7 +659,7 @@ export default function DatabaseStudioPage() {
                           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
                             filters.length > 0 || showFilterBuilder
                               ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-300"
-                              : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10 hover:text-white"
+                              : "bg-zinc-900 border-zinc-800 text-zinc-300 hover:bg-zinc-850 hover:text-white"
                           }`}
                         >
                           <Filter className="w-3 h-3" />
@@ -659,7 +669,7 @@ export default function DatabaseStudioPage() {
                         {/* Export CSV */}
                         <button
                           onClick={handleExportCSV}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300 bg-white/5 hover:bg-white/10 border border-white/10 transition-colors"
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-300 bg-zinc-900 hover:bg-zinc-850 border border-zinc-800 transition-colors"
                           title="Export table rows as CSV"
                         >
                           <Download className="w-3 h-3" />
@@ -695,7 +705,7 @@ export default function DatabaseStudioPage() {
                         loadSchema();
                         loadTablesList();
                       }}
-                      className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors"
+                      className="p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800/60 transition-colors"
                       title="Reload table data"
                     >
                       <RefreshCw className={`w-4 h-4 ${loadingRows ? "animate-spin text-emerald-400" : ""}`} />
@@ -706,19 +716,19 @@ export default function DatabaseStudioPage() {
 
               {/* Filter Builder Panel (when open) */}
               {showFilterBuilder && (
-                <div className="px-5 py-3 bg-[#111827] border-b border-white/10 flex flex-wrap items-center gap-3 text-xs">
-                  <span className="text-slate-400 font-medium">Filter rules:</span>
+                <div className="px-5 py-3 bg-[#0e0e11] border-b border-zinc-800 flex flex-wrap items-center gap-3 text-xs">
+                  <span className="text-zinc-400 font-medium">Filter rules:</span>
                   {filters.map((f, idx) => (
                     <div
                       key={idx}
-                      className="flex items-center gap-2 bg-black/40 px-3 py-1 rounded-lg border border-white/10 font-mono"
+                      className="flex items-center gap-2 bg-zinc-950 px-3 py-1 rounded-lg border border-zinc-800 font-mono"
                     >
                       <span className="text-emerald-400">{f.column}</span>
-                      <span className="text-slate-500">{f.operator}</span>
-                      <span className="text-slate-300">&quot;{f.value}&quot;</span>
+                      <span className="text-zinc-500">{f.operator}</span>
+                      <span className="text-zinc-300">&quot;{f.value}&quot;</span>
                       <button
                         onClick={() => setFilters(filters.filter((_, i) => i !== idx))}
-                        className="text-slate-500 hover:text-rose-400 ml-1"
+                        className="text-zinc-500 hover:text-rose-400 ml-1"
                       >
                         <X className="w-3 h-3" />
                       </button>
@@ -729,7 +739,7 @@ export default function DatabaseStudioPage() {
                   <div className="flex items-center gap-2">
                     <select
                       id="new-filter-col"
-                      className="bg-black/60 border border-white/10 rounded-md px-2 py-1 text-slate-200 text-xs font-mono"
+                      className="bg-zinc-950 border border-zinc-800 rounded-md px-2 py-1 text-zinc-200 text-xs font-mono"
                     >
                       {columns.map((c) => (
                         <option key={c.name} value={c.name}>
@@ -740,7 +750,7 @@ export default function DatabaseStudioPage() {
 
                     <select
                       id="new-filter-op"
-                      className="bg-black/60 border border-white/10 rounded-md px-2 py-1 text-slate-200 text-xs font-mono"
+                      className="bg-zinc-950 border border-zinc-800 rounded-md px-2 py-1 text-zinc-200 text-xs font-mono"
                     >
                       <option value="eq">=</option>
                       <option value="neq">!=</option>
@@ -755,7 +765,7 @@ export default function DatabaseStudioPage() {
                       id="new-filter-val"
                       type="text"
                       placeholder="value..."
-                      className="bg-black/60 border border-white/10 rounded-md px-2 py-1 text-slate-200 text-xs font-mono w-28"
+                      className="bg-zinc-950 border border-zinc-800 rounded-md px-2 py-1 text-zinc-200 text-xs font-mono w-28"
                     />
 
                     <button
@@ -775,14 +785,14 @@ export default function DatabaseStudioPage() {
                           valEl.value = "";
                         }
                       }}
-                      className="px-2.5 py-1 rounded bg-white/10 hover:bg-white/15 text-slate-200 font-medium"
+                      className="px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-medium"
                     >
                       Apply
                     </button>
                     {filters.length > 0 && (
                       <button
                         onClick={() => setFilters([])}
-                        className="text-slate-500 hover:text-white underline text-[11px]"
+                        className="text-zinc-500 hover:text-white underline text-[11px]"
                       >
                         Clear All
                       </button>
@@ -797,15 +807,15 @@ export default function DatabaseStudioPage() {
                   <div className="flex-1 overflow-auto">
                     <table className="w-full text-left text-xs border-collapse">
                       {/* Sticky Table Header */}
-                      <thead className="bg-[#0F172A] border-b border-white/10 sticky top-0 z-20 select-none">
+                      <thead className="bg-[#141418] border-b border-zinc-800 sticky top-0 z-20 select-none shadow-sm">
                         <tr>
                           {/* Row selection checkbox header */}
-                          <th className="w-10 px-3 py-2.5 border-r border-white/5 text-center">
+                          <th className="w-10 px-3 py-3 border-r border-zinc-800/80 text-center">
                             <input
                               type="checkbox"
                               checked={rows.length > 0 && selectedRowPks.size === rows.length}
                               onChange={toggleSelectAll}
-                              className="rounded border-slate-700 bg-slate-900 text-emerald-500 focus:ring-0 w-3.5 h-3.5 cursor-pointer"
+                              className="rounded border-zinc-700 bg-zinc-900 text-emerald-500 focus:ring-0 w-3.5 h-3.5 cursor-pointer"
                             />
                           </th>
 
@@ -816,12 +826,12 @@ export default function DatabaseStudioPage() {
                               <th
                                 key={col.name}
                                 onClick={() => handleSort(col.name)}
-                                className="px-4 py-2.5 font-mono text-[11px] font-semibold text-slate-300 border-r border-white/5 hover:bg-white/[0.03] cursor-pointer transition-colors whitespace-nowrap"
+                                className="px-4 py-3 font-mono text-[11px] font-semibold text-zinc-300 border-r border-zinc-800/80 hover:bg-zinc-800/40 cursor-pointer transition-colors whitespace-nowrap min-w-[140px]"
                               >
                                 <div className="flex items-center justify-between gap-2">
                                   <div className="flex items-center gap-1.5">
                                     <span>{col.name}</span>
-                                    <span className="text-[9px] px-1 py-0.2 rounded bg-black/40 text-slate-500 border border-slate-800">
+                                    <span className="text-[9px] px-1 py-0.2 rounded bg-zinc-900 text-zinc-400 border border-zinc-800">
                                       {col.udt_name}
                                     </span>
                                     {col.is_primary_key && (
@@ -835,7 +845,7 @@ export default function DatabaseStudioPage() {
                                   </div>
                                   <ArrowUpDown
                                     className={`w-3 h-3 transition-colors ${
-                                      isSorted ? "text-emerald-400 font-bold" : "text-slate-600 hover:text-slate-400"
+                                      isSorted ? "text-emerald-400 font-bold" : "text-zinc-600 hover:text-zinc-400"
                                     }`}
                                   />
                                 </div>
@@ -846,12 +856,12 @@ export default function DatabaseStudioPage() {
                       </thead>
 
                       {/* Rows Body */}
-                      <tbody className="divide-y divide-white/5 font-mono">
+                      <tbody className="divide-y divide-zinc-800/60 font-mono">
                         {loadingRows ? (
                           <tr>
                             <td
                               colSpan={columns.length + 1}
-                              className="px-6 py-16 text-center text-slate-500"
+                              className="px-6 py-16 text-center text-zinc-500"
                             >
                               <div className="flex items-center justify-center gap-2">
                                 <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
@@ -863,11 +873,11 @@ export default function DatabaseStudioPage() {
                           <tr>
                             <td
                               colSpan={columns.length + 1}
-                              className="px-6 py-16 text-center text-slate-500"
+                              className="px-6 py-16 text-center text-zinc-500"
                             >
                               <div className="max-w-xs mx-auto space-y-2">
-                                <Table className="w-8 h-8 text-slate-700 mx-auto" />
-                                <p className="text-slate-400 font-sans text-xs">No records found</p>
+                                <Table className="w-8 h-8 text-zinc-700 mx-auto" />
+                                <p className="text-zinc-400 font-sans text-xs">No records found</p>
                                 <button
                                   onClick={() => setIsInsertDrawerOpen(true)}
                                   className="text-emerald-400 hover:underline text-xs font-sans font-medium"
@@ -888,16 +898,16 @@ export default function DatabaseStudioPage() {
                                 className={`transition-colors group ${
                                   isSelected
                                     ? "bg-emerald-500/10 hover:bg-emerald-500/15"
-                                    : "hover:bg-white/[0.02]"
+                                    : "hover:bg-zinc-800/30"
                                 }`}
                               >
                                 {/* Checkbox */}
-                                <td className="w-10 px-3 py-2 border-r border-white/5 text-center">
+                                <td className="w-10 px-3 py-2.5 border-r border-zinc-800/60 text-center">
                                   <input
                                     type="checkbox"
                                     checked={isSelected}
                                     onChange={() => toggleSelectRow(pkVal)}
-                                    className="rounded border-slate-700 bg-slate-900 text-emerald-500 focus:ring-0 w-3.5 h-3.5 cursor-pointer"
+                                    className="rounded border-zinc-700 bg-zinc-900 text-emerald-500 focus:ring-0 w-3.5 h-3.5 cursor-pointer"
                                   />
                                 </td>
 
@@ -906,6 +916,8 @@ export default function DatabaseStudioPage() {
                                   const cellVal = row[col.name];
                                   const isEditing =
                                     editingCell?.pk === pkVal && editingCell?.column === col.name;
+                                  const isRecentlySaved = recentlyUpdated === `${pkVal}_${col.name}`;
+                                  const isLongVal = cellVal !== null && cellVal !== undefined && (typeof cellVal === "object" || String(cellVal).length > 32);
 
                                   return (
                                     <td
@@ -923,63 +935,125 @@ export default function DatabaseStudioPage() {
                                               : String(cellVal),
                                         });
                                       }}
-                                      className="px-4 py-2 border-r border-white/5 max-w-xs truncate cursor-cell relative"
+                                      className={`px-4 py-2 border-r border-zinc-800/60 min-w-[140px] max-w-[420px] truncate cursor-cell relative group/cell transition-colors duration-300 ${
+                                        isRecentlySaved ? "bg-emerald-500/20 ring-1 ring-emerald-500/60" : ""
+                                      }`}
                                     >
                                       {isEditing ? (
-                                        <div className="flex items-center gap-1.5">
-                                          <input
-                                            autoFocus
-                                            type="text"
-                                            value={editingCell.val}
-                                            onChange={(e) =>
-                                              setEditingCell({ ...editingCell, val: e.target.value })
-                                            }
-                                            onKeyDown={(e) => {
-                                              if (e.key === "Enter") handleSaveCell();
-                                              if (e.key === "Escape") setEditingCell(null);
-                                            }}
-                                            className="w-full px-2 py-0.5 bg-black border border-emerald-500 rounded text-xs text-white focus:outline-none"
-                                          />
+                                        <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                                          {col.udt_name.toLowerCase() === "bool" ? (
+                                            <select
+                                              autoFocus
+                                              value={editingCell.val}
+                                              onChange={(e) =>
+                                                setEditingCell({ ...editingCell, val: e.target.value })
+                                              }
+                                              className="px-2 py-1 bg-zinc-950 border border-emerald-500 rounded text-xs text-white focus:outline-none font-mono"
+                                            >
+                                              <option value="true">true</option>
+                                              <option value="false">false</option>
+                                              {col.is_nullable && <option value="NULL">NULL</option>}
+                                            </select>
+                                          ) : (
+                                            <input
+                                              autoFocus
+                                              onFocus={(e) => e.target.select()}
+                                              type="text"
+                                              value={editingCell.val}
+                                              onChange={(e) =>
+                                                setEditingCell({ ...editingCell, val: e.target.value })
+                                              }
+                                              onKeyDown={(e) => {
+                                                if (e.key === "Enter") handleSaveCell();
+                                                if (e.key === "Escape") setEditingCell(null);
+                                              }}
+                                              className="w-full px-2 py-1 bg-zinc-950 border-2 border-emerald-500 rounded text-xs text-white focus:outline-none font-mono shadow-sm"
+                                            />
+                                          )}
                                           <button
                                             onClick={handleSaveCell}
                                             disabled={savingCell}
-                                            className="text-emerald-400 hover:text-emerald-300"
+                                            className="p-1 rounded bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 shrink-0"
+                                            title="Save (Enter)"
                                           >
-                                            <Check className="w-3.5 h-3.5" />
+                                            {savingCell ? (
+                                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                            ) : (
+                                              <Check className="w-3.5 h-3.5" />
+                                            )}
                                           </button>
                                           <button
                                             onClick={() => setEditingCell(null)}
-                                            className="text-slate-500 hover:text-slate-300"
+                                            className="p-1 rounded bg-zinc-800 text-zinc-400 hover:text-white shrink-0"
+                                            title="Cancel (Esc)"
                                           >
                                             <X className="w-3.5 h-3.5" />
                                           </button>
                                         </div>
-                                      ) : cellVal === null || cellVal === undefined ? (
-                                        <span className="text-slate-600 italic text-[11px]">NULL</span>
-                                      ) : col.udt_name.toLowerCase() === "bool" ? (
-                                        <span
-                                          className={`px-1.5 py-0.2 rounded text-[10px] font-semibold uppercase ${
-                                            cellVal
-                                              ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                                              : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
-                                          }`}
-                                        >
-                                          {String(cellVal)}
-                                        </span>
-                                      ) : typeof cellVal === "object" ? (
-                                        <span
-                                          className="text-slate-400 text-[11px] truncate block"
-                                          title={JSON.stringify(cellVal, null, 2)}
-                                        >
-                                          {JSON.stringify(cellVal)}
-                                        </span>
                                       ) : (
-                                        <span
-                                          className="text-slate-200 text-xs truncate block"
-                                          title={String(cellVal)}
-                                        >
-                                          {String(cellVal)}
-                                        </span>
+                                        <div className="flex items-center justify-between gap-1 group-hover/cell:pr-0">
+                                          <div className="truncate flex-1">
+                                            {cellVal === null || cellVal === undefined ? (
+                                              <span className="text-zinc-600 italic text-[11px]">NULL</span>
+                                            ) : col.udt_name.toLowerCase() === "bool" ? (
+                                              <span
+                                                className={`px-1.5 py-0.2 rounded text-[10px] font-semibold uppercase ${
+                                                  cellVal
+                                                    ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                                                    : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                                                }`}
+                                              >
+                                                {String(cellVal)}
+                                              </span>
+                                            ) : typeof cellVal === "object" ? (
+                                              <span
+                                                className="text-zinc-400 text-[11px] truncate block"
+                                                title={JSON.stringify(cellVal, null, 2)}
+                                              >
+                                                {JSON.stringify(cellVal)}
+                                              </span>
+                                            ) : (
+                                              <span
+                                                className="text-zinc-200 text-xs truncate block"
+                                                title={String(cellVal)}
+                                              >
+                                                {String(cellVal)}
+                                              </span>
+                                            )}
+                                          </div>
+
+                                          <div className="flex items-center gap-1 opacity-0 group-hover/cell:opacity-100 transition-opacity shrink-0">
+                                            {isLongVal && (
+                                              <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  setInspectCellData({ column: col.name, val: cellVal, pk: pkVal });
+                                                }}
+                                                className="p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-white"
+                                                title="Inspect full value"
+                                              >
+                                                <Eye className="w-3 h-3" />
+                                              </button>
+                                            )}
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                setEditingCell({
+                                                  pk: pkVal,
+                                                  column: col.name,
+                                                  originalVal: cellVal,
+                                                  val: cellVal === null || cellVal === undefined ? "" : typeof cellVal === "object" ? JSON.stringify(cellVal) : String(cellVal),
+                                                });
+                                              }}
+                                              className="p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-emerald-400"
+                                              title="Edit cell"
+                                            >
+                                              <Pencil className="w-3 h-3" />
+                                            </button>
+                                          </div>
+                                        </div>
                                       )}
                                     </td>
                                   );
@@ -993,7 +1067,7 @@ export default function DatabaseStudioPage() {
                   </div>
 
                   {/* Grid Pagination Footer */}
-                  <div className="h-12 px-5 border-t border-white/10 bg-[#0C1222]/80 flex items-center justify-between text-xs text-slate-400 shrink-0">
+                  <div className="h-12 px-5 border-t border-zinc-800 bg-[#111114] flex items-center justify-between text-xs text-zinc-400 shrink-0">
                     <div className="flex items-center gap-3">
                       <span>
                         Showing {rows.length === 0 ? 0 : (page - 1) * pageSize + 1} -{" "}
@@ -1005,11 +1079,12 @@ export default function DatabaseStudioPage() {
                           setPageSize(Number(e.target.value));
                           setPage(1);
                         }}
-                        className="bg-black/40 border border-white/10 rounded px-2 py-0.5 text-xs text-slate-300 focus:outline-none"
+                        className="bg-zinc-950 border border-zinc-800 rounded px-2 py-0.5 text-xs text-zinc-300 focus:outline-none"
                       >
                         <option value={25}>25 / page</option>
                         <option value={50}>50 / page</option>
                         <option value={100}>100 / page</option>
+                        <option value={250}>250 / page</option>
                       </select>
                     </div>
 
@@ -1017,17 +1092,17 @@ export default function DatabaseStudioPage() {
                       <button
                         onClick={() => setPage((p) => Math.max(1, p - 1))}
                         disabled={page <= 1}
-                        className="p-1 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 disabled:opacity-40 transition-colors"
+                        className="p-1 rounded-md bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 disabled:opacity-40 transition-colors"
                       >
                         <ChevronLeft className="w-4 h-4" />
                       </button>
-                      <span className="font-mono text-slate-300">
+                      <span className="font-mono text-zinc-300">
                         {page} / {totalPages}
                       </span>
                       <button
                         onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                         disabled={page >= totalPages}
-                        className="p-1 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 disabled:opacity-40 transition-colors"
+                        className="p-1 rounded-md bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 disabled:opacity-40 transition-colors"
                       >
                         <ChevronRight className="w-4 h-4" />
                       </button>
@@ -1036,16 +1111,17 @@ export default function DatabaseStudioPage() {
                 </div>
               ) : (
                 /* TAB 1 SUBVIEW: SCHEMA & INDEXES */
-                <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-[#09090b]">
                   {/* Columns Definition */}
-                  <div className="rounded-xl border border-white/10 bg-slate-900/40 overflow-hidden">
-                    <div className="px-5 py-3 border-b border-white/10 bg-white/[0.02] flex items-center justify-between">
-                      <h3 className="text-xs font-semibold text-slate-200 uppercase tracking-wider font-mono">
-                        Columns ({columns.length})
+                  <div className="rounded-xl border border-zinc-800 bg-[#111114] overflow-hidden">
+                    <div className="px-5 py-3.5 border-b border-zinc-800 bg-[#141418] flex items-center justify-between">
+                      <h3 className="text-xs font-semibold text-zinc-200 uppercase tracking-wider font-mono flex items-center gap-2">
+                        <Layers className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Columns ({columns.length})</span>
                       </h3>
                     </div>
                     <table className="w-full text-left text-xs font-mono">
-                      <thead className="bg-black/30 border-b border-white/5 text-slate-400 text-[10px] uppercase">
+                      <thead className="bg-[#0e0e11] border-b border-zinc-800 text-zinc-400 text-[10px] uppercase">
                         <tr>
                           <th className="px-4 py-2.5">Name</th>
                           <th className="px-4 py-2.5">Data Type</th>
@@ -1054,28 +1130,28 @@ export default function DatabaseStudioPage() {
                           <th className="px-4 py-2.5">Default Expression</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-white/5">
+                      <tbody className="divide-y divide-zinc-800/60 text-zinc-300">
                         {columns.map((c) => (
-                          <tr key={c.name} className="hover:bg-white/[0.02]">
-                            <td className="px-4 py-2.5 text-white font-semibold">{c.name}</td>
-                            <td className="px-4 py-2.5 text-emerald-400">{c.udt_name}</td>
+                          <tr key={c.name} className="hover:bg-zinc-850/40 transition-colors">
+                            <td className="px-4 py-2.5 text-zinc-100 font-semibold">{c.name}</td>
+                            <td className="px-4 py-2.5 text-emerald-400 font-mono">{c.udt_name}</td>
                             <td className="px-4 py-2.5">
                               {c.is_nullable ? (
-                                <span className="text-slate-400">YES</span>
+                                <span className="text-zinc-500">YES</span>
                               ) : (
-                                <span className="text-rose-400 font-semibold">NO</span>
+                                <span className="text-rose-400 font-semibold text-[11px]">NO</span>
                               )}
                             </td>
                             <td className="px-4 py-2.5">
                               {c.is_primary_key ? (
-                                <span className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[10px]">
+                                <span className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/30 text-[10px] font-semibold">
                                   PRIMARY KEY
                                 </span>
                               ) : (
-                                <span className="text-slate-600">-</span>
+                                <span className="text-zinc-600">-</span>
                               )}
                             </td>
-                            <td className="px-4 py-2.5 text-slate-400">{c.default_value || "-"}</td>
+                            <td className="px-4 py-2.5 text-zinc-400">{c.default_value || "-"}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -1083,14 +1159,15 @@ export default function DatabaseStudioPage() {
                   </div>
 
                   {/* Indexes Definition */}
-                  <div className="rounded-xl border border-white/10 bg-slate-900/40 overflow-hidden">
-                    <div className="px-5 py-3 border-b border-white/10 bg-white/[0.02] flex items-center justify-between">
-                      <h3 className="text-xs font-semibold text-slate-200 uppercase tracking-wider font-mono">
-                        Indexes ({indexes.length})
+                  <div className="rounded-xl border border-zinc-800 bg-[#111114] overflow-hidden">
+                    <div className="px-5 py-3.5 border-b border-zinc-800 bg-[#141418] flex items-center justify-between">
+                      <h3 className="text-xs font-semibold text-zinc-200 uppercase tracking-wider font-mono flex items-center gap-2">
+                        <KeyRound className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Indexes ({indexes.length})</span>
                       </h3>
                     </div>
                     {indexes.length === 0 ? (
-                      <div className="p-6 text-center text-xs text-slate-500">
+                      <div className="p-6 text-center text-xs text-zinc-500">
                         No secondary indexes found on this table.
                       </div>
                     ) : (
@@ -1098,10 +1175,10 @@ export default function DatabaseStudioPage() {
                         {indexes.map((idx) => (
                           <div
                             key={idx.name}
-                            className="p-3 rounded-lg bg-black/40 border border-white/5 font-mono text-xs"
+                            className="p-3 rounded-lg bg-[#0e0e11] border border-zinc-800/80 font-mono text-xs"
                           >
                             <span className="text-emerald-400 font-semibold">{idx.name}</span>
-                            <pre className="mt-1 text-[11px] text-slate-400 overflow-x-auto whitespace-pre-wrap">
+                            <pre className="mt-1 text-[11px] text-zinc-400 overflow-x-auto whitespace-pre-wrap">
                               {idx.definition}
                             </pre>
                           </div>
@@ -1114,18 +1191,18 @@ export default function DatabaseStudioPage() {
             </div>
           ) : (
             /* TAB 2: SQL CONSOLE */
-            <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="flex-1 flex flex-col overflow-hidden bg-[#09090b]">
               {/* SQL Console Header Toolbar */}
-              <div className="px-5 py-3 border-b border-white/10 bg-[#0C1222]/60 flex items-center justify-between gap-4">
+              <div className="px-5 py-3 border-b border-zinc-800 bg-[#121216] flex items-center justify-between gap-4">
                 <div className="flex items-center gap-2 overflow-x-auto">
-                  <span className="text-xs text-slate-400 shrink-0 font-medium">Quick Snippets:</span>
+                  <span className="text-xs text-zinc-400 shrink-0 font-medium">Quick Snippets:</span>
                   <button
                     onClick={() =>
                       setSqlQuery(
                         `SELECT * FROM ${selectedTable || "information_schema.tables"} LIMIT 25;`
                       )
                     }
-                    className="px-2.5 py-1 rounded bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] text-slate-300 font-mono transition-colors shrink-0"
+                    className="px-2.5 py-1 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-[11px] text-zinc-300 font-mono transition-colors shrink-0"
                   >
                     Select 25 Rows
                   </button>
@@ -1135,7 +1212,7 @@ export default function DatabaseStudioPage() {
                         `SELECT relname AS table_name, pg_size_pretty(pg_total_relation_size(relid)) AS total_size \nFROM pg_catalog.pg_statio_user_tables \nORDER BY pg_total_relation_size(relid) DESC;`
                       )
                     }
-                    className="px-2.5 py-1 rounded bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] text-slate-300 font-mono transition-colors shrink-0"
+                    className="px-2.5 py-1 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-[11px] text-zinc-300 font-mono transition-colors shrink-0"
                   >
                     Table Storage Sizes
                   </button>
@@ -1145,20 +1222,20 @@ export default function DatabaseStudioPage() {
                         `SELECT count(*), state \nFROM pg_stat_activity \nWHERE datname = current_database() \nGROUP BY state;`
                       )
                     }
-                    className="px-2.5 py-1 rounded bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] text-slate-300 font-mono transition-colors shrink-0"
+                    className="px-2.5 py-1 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-[11px] text-zinc-300 font-mono transition-colors shrink-0"
                   >
                     Connection Stats
                   </button>
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <span className="text-[11px] text-slate-500 font-mono hidden sm:inline">
+                  <span className="text-[11px] text-zinc-500 font-mono hidden sm:inline">
                     Ctrl + Enter to run
                   </span>
                   <button
                     onClick={handleExecuteSql}
                     disabled={sqlRunning || !sqlQuery.trim()}
-                    className="flex items-center gap-2 px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md shadow-indigo-600/20 disabled:opacity-50 transition-colors"
+                    className="flex items-center gap-2 px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-md shadow-emerald-900/30 disabled:opacity-50 transition-colors"
                   >
                     {sqlRunning ? (
                       <>
@@ -1178,7 +1255,7 @@ export default function DatabaseStudioPage() {
               {/* Editor + Results Split */}
               <div className="flex-1 flex flex-col overflow-hidden">
                 {/* SQL Editor Area */}
-                <div className="h-48 border-b border-white/10 bg-[#0B0F19] relative">
+                <div className="h-48 border-b border-zinc-800 bg-[#0c0c0e] relative">
                   <textarea
                     value={sqlQuery}
                     onChange={(e) => setSqlQuery(e.target.value)}
@@ -1189,16 +1266,16 @@ export default function DatabaseStudioPage() {
                       }
                     }}
                     placeholder="-- Write standard PostgreSQL query here... (e.g. SELECT * FROM students;)"
-                    className="w-full h-full p-4 bg-transparent text-slate-100 font-mono text-xs focus:outline-none resize-none selection:bg-indigo-500/30 leading-relaxed"
+                    className="w-full h-full p-4 bg-transparent text-zinc-100 placeholder-zinc-600 font-mono text-xs focus:outline-none resize-none selection:bg-emerald-500/30 leading-relaxed"
                     spellCheck={false}
                   />
                 </div>
 
                 {/* SQL Results Area */}
-                <div className="flex-1 flex flex-col overflow-hidden bg-[#080C14]">
+                <div className="flex-1 flex flex-col overflow-hidden bg-[#09090b]">
                   {/* Results Header Status */}
-                  <div className="px-5 py-2.5 border-b border-white/5 bg-[#0C1222]/40 flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2 font-mono text-slate-400">
+                  <div className="px-5 py-2.5 border-b border-zinc-800 bg-[#111114] flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2 font-mono text-zinc-400">
                       {sqlResult?.success ? (
                         <span className="text-emerald-400 flex items-center gap-1.5">
                           <Check className="w-3.5 h-3.5" />
@@ -1216,7 +1293,7 @@ export default function DatabaseStudioPage() {
                       )}
 
                       {sqlResult?.duration_ms !== undefined && sqlResult.duration_ms > 0 && (
-                        <span className="text-slate-500">
+                        <span className="text-zinc-500">
                           in {sqlResult.duration_ms.toFixed(1)} ms
                         </span>
                       )}
@@ -1245,7 +1322,7 @@ export default function DatabaseStudioPage() {
                           link.click();
                           document.body.removeChild(link);
                         }}
-                        className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-white"
+                        className="flex items-center gap-1 text-[11px] text-zinc-400 hover:text-white transition-colors"
                       >
                         <Download className="w-3 h-3" />
                         <span>Export CSV</span>
@@ -1254,7 +1331,7 @@ export default function DatabaseStudioPage() {
                   </div>
 
                   {/* Results Data Table or Error Output */}
-                  <div className="flex-1 overflow-auto">
+                  <div className="flex-1 overflow-auto bg-[#09090b]">
                     {sqlResult?.error ? (
                       <div className="p-6">
                         <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 font-mono text-xs text-rose-300 whitespace-pre-wrap">
@@ -1263,38 +1340,38 @@ export default function DatabaseStudioPage() {
                       </div>
                     ) : sqlResult?.rows && sqlResult.rows.length > 0 ? (
                       <table className="w-full text-left text-xs border-collapse">
-                        <thead className="bg-[#0F172A] border-b border-white/10 sticky top-0 z-10 select-none">
+                        <thead className="bg-[#141418] border-b border-zinc-800 sticky top-0 z-10 select-none">
                           <tr>
                             {(sqlResult.columns || Object.keys(sqlResult.rows[0])).map((col) => (
                               <th
                                 key={col}
-                                className="px-4 py-2.5 font-mono text-[11px] font-semibold text-slate-300 border-r border-white/5 whitespace-nowrap"
+                                className="px-4 py-2.5 font-mono text-[11px] font-semibold text-zinc-300 border-r border-zinc-800 whitespace-nowrap"
                               >
                                 {col}
                               </th>
                             ))}
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-white/5 font-mono">
+                        <tbody className="divide-y divide-zinc-800/60 font-mono">
                           {sqlResult.rows.map((row, rIdx) => {
                             const cols = sqlResult.columns || Object.keys(sqlResult.rows![0]);
                             return (
-                              <tr key={rIdx} className="hover:bg-white/[0.02]">
+                              <tr key={rIdx} className="hover:bg-zinc-850/40 transition-colors">
                                 {cols.map((c) => {
                                   const v = row[c];
                                   return (
                                     <td
                                       key={c}
-                                      className="px-4 py-2 border-r border-white/5 max-w-sm truncate"
+                                      className="px-4 py-2 border-r border-zinc-800/60 max-w-sm truncate text-zinc-200"
                                     >
                                       {v === null || v === undefined ? (
-                                        <span className="text-slate-600 italic">NULL</span>
+                                        <span className="text-zinc-600 italic">NULL</span>
                                       ) : typeof v === "object" ? (
-                                        <span className="text-slate-400 truncate block">
+                                        <span className="text-zinc-400 truncate block">
                                           {JSON.stringify(v)}
                                         </span>
                                       ) : (
-                                        <span className="text-slate-200 truncate block">{String(v)}</span>
+                                        <span className="text-zinc-200 truncate block">{String(v)}</span>
                                       )}
                                     </td>
                                   );
@@ -1305,12 +1382,12 @@ export default function DatabaseStudioPage() {
                         </tbody>
                       </table>
                     ) : sqlResult ? (
-                      <div className="p-8 text-center text-xs text-slate-500">
+                      <div className="p-8 text-center text-xs text-zinc-500 font-mono">
                         Query returned 0 rows.
                       </div>
                     ) : (
-                      <div className="p-12 text-center text-xs text-slate-600">
-                        <Terminal className="w-8 h-8 mx-auto mb-2 text-slate-700" />
+                      <div className="p-12 text-center text-xs text-zinc-600">
+                        <Terminal className="w-8 h-8 mx-auto mb-2 text-zinc-700" />
                         <p>Write an SQL query above and click &quot;Run Query&quot; (or Ctrl+Enter)</p>
                       </div>
                     )}
@@ -1321,6 +1398,116 @@ export default function DatabaseStudioPage() {
           )}
         </main>
       </div>
+    </div>
+
+      {/* Cell Inspector Modal (Workable Viewer & Editor for long text / JSON / metadata) */}
+      <AnimatePresence>
+        {inspectCellData && (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-2xl bg-[#111114] border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]"
+            >
+              {/* Modal Header */}
+              <div className="px-5 py-3.5 border-b border-zinc-800 bg-[#141418] flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Eye className="w-4 h-4 text-emerald-400" />
+                  <span className="text-xs font-semibold text-zinc-200 font-mono">
+                    Inspect Cell: <span className="text-emerald-400">{inspectCellData.column}</span>
+                  </span>
+                  <span className="text-[10px] text-zinc-500 font-mono">
+                    (Row PK: {String(inspectCellData.pk)})
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      const text =
+                        inspectCellData.val === null
+                          ? "null"
+                          : typeof inspectCellData.val === "object"
+                          ? JSON.stringify(inspectCellData.val, null, 2)
+                          : String(inspectCellData.val);
+                      navigator.clipboard.writeText(text);
+                      setIsCopied(true);
+                      setTimeout(() => setIsCopied(false), 2000);
+                    }}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium border border-zinc-700 transition-colors"
+                  >
+                    {isCopied ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        <span className="text-emerald-400">Copied</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>Copy</span>
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => setInspectCellData(null)}
+                    className="p-1 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Modal Body */}
+              <div className="flex-1 overflow-y-auto p-4 bg-[#09090b]">
+                <pre className="font-mono text-xs text-zinc-200 whitespace-pre-wrap break-all leading-relaxed p-4 rounded-xl bg-zinc-950 border border-zinc-800/80 max-h-[60vh] overflow-auto selection:bg-emerald-500/20">
+                  {inspectCellData.val === null
+                    ? "null"
+                    : typeof inspectCellData.val === "object"
+                    ? JSON.stringify(inspectCellData.val, null, 2)
+                    : String(inspectCellData.val)}
+                </pre>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="px-5 py-3 border-t border-zinc-800 bg-[#141418] flex items-center justify-between">
+                <span className="text-[11px] text-zinc-500 font-mono">
+                  Length:{" "}
+                  {inspectCellData.val === null
+                    ? 0
+                    : typeof inspectCellData.val === "object"
+                    ? JSON.stringify(inspectCellData.val).length
+                    : String(inspectCellData.val).length}{" "}
+                  characters
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      const curVal = inspectCellData.val;
+                      setEditingCell({
+                        pk: inspectCellData.pk,
+                        column: inspectCellData.column,
+                        originalVal: curVal,
+                        val: curVal === null ? "" : typeof curVal === "object" ? JSON.stringify(curVal) : String(curVal),
+                      });
+                      setInspectCellData(null);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition-colors shadow-sm"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                    <span>Edit this cell</span>
+                  </button>
+                  <button
+                    onClick={() => setInspectCellData(null)}
+                    className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-medium border border-zinc-700 transition-colors"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Modals & Drawers */}
       <VisualTableBuilderModal
