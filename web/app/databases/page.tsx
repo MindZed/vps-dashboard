@@ -105,7 +105,7 @@ export default function DatabasesPage() {
     const hasRealPassword = password !== "•••(managed)•••";
 
     const intHost = clusterInfo?.internal_host || "postgres";
-    const extHost = clusterInfo?.external_host || "129.154.34.1";
+    const extHost = clusterInfo?.external_host || (typeof window !== "undefined" ? window.location.hostname : "vps-host");
     const sshPort = clusterInfo?.ssh_port || "5433";
     const port = clusterInfo?.port || "5432";
     const pgbouncerPort = clusterInfo?.pgbouncer_port || "6432";

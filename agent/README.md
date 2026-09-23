@@ -29,7 +29,7 @@ A high-performance, ultra-lightweight Go daemon (< 15 MB RAM) designed for Oracl
    AGENT_SECRET=your_super_secret_key_change_me
    DATABASE_URL=postgres://postgres:your_dokploy_pw@postgres-databases-sharedpostgres-kooq42:5432/postgres?sslmode=disable
    PG_INTERNAL_HOST=postgres-databases-sharedpostgres-kooq42
-   PG_EXTERNAL_HOST=129.154.34.1
+   PG_EXTERNAL_HOST=your_vps_ip
    SSH_LOCAL_PORT=5433
    ```
 5. Deploy! Expose domain `agent.mindzed.tech` through Cloudflare Tunnel or Dokploy Traefik.

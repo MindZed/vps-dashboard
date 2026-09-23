@@ -97,6 +97,15 @@ export default function ConnectionCard({ data, onClose }: ConnectionCardProps) {
     return url.replace(`:${cardData.password}@`, ":••••••••••••••••@");
   };
 
+  const extractedExtHost = (() => {
+    try {
+      const match = cardData.connections.external_vercel.match(/@([^:/]+)/);
+      return match ? match[1] : "vps-host";
+    } catch {
+      return "vps-host";
+    }
+  })();
+
   const tabs = [
     {
       id: "dokploy",
@@ -115,7 +124,7 @@ export default function ConnectionCard({ data, onClose }: ConnectionCardProps) {
       icon: Terminal,
       url: cardData.connections.ssh_tunnel,
       desc: "Connect local GUI tools (DBeaver, TablePlus, pgAdmin) securely through an encrypted SSH tunnel.",
-      helperCmd: `ssh -L 5433:postgres-databases-sharedpostgres-kooq42:5432 opc@129.154.34.1`,
+      helperCmd: `ssh -L 5433:postgres-databases-sharedpostgres-kooq42:5432 opc@${extractedExtHost}`,
       tip: "Run the command below in your local terminal to forward port 5433 securely to your workstation.",
     },
     {
@@ -134,7 +143,7 @@ export default function ConnectionCard({ data, onClose }: ConnectionCardProps) {
 
   const envBlock = `# MindZed PostgreSQL (${cardData.database}) - ${currentTab.label}
 DATABASE_URL="${currentTab.url}"
-PG_HOST="${currentTab.id === 'dokploy' ? 'postgres-databases-sharedpostgres-kooq42' : currentTab.id === 'ssh' ? 'localhost' : '129.154.34.1'}"
+PG_HOST="${currentTab.id === 'dokploy' ? 'postgres-databases-sharedpostgres-kooq42' : currentTab.id === 'ssh' ? 'localhost' : extractedExtHost}"
 PG_PORT="${currentTab.portBadge}"
 PG_USER="${cardData.username}"
 PG_PASSWORD="${isManaged ? '••••••••••••••••' : cardData.password}"

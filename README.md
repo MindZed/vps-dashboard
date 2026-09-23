@@ -134,7 +134,7 @@ go run main.go
      AGENT_SECRET=your_32_character_secret_key
      DATABASE_URL=postgres://postgres:password@postgres-databases-sharedpostgres-kooq42:5432/postgres?sslmode=disable
      PG_INTERNAL_HOST=postgres-databases-sharedpostgres-kooq42
-     PG_EXTERNAL_HOST=129.154.34.1
+     PG_EXTERNAL_HOST=your_vps_ip
      SSH_LOCAL_PORT=5433
      WHITELIST_FILE=/app/data/whitelist.json
      ```
