@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"strings"
@@ -17,6 +18,43 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/mindzed/mindzed-agent/handler"
 )
+
+// sanitizeDatabaseURL properly URL-encodes passwords that contain special characters like '@'
+func sanitizeDatabaseURL(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return raw
+	}
+
+	schemaIdx := strings.Index(raw, "://")
+	if schemaIdx == -1 {
+		return raw
+	}
+	schema := raw[:schemaIdx+3]
+	remainder := raw[schemaIdx+3:]
+
+	lastAtIdx := strings.LastIndex(remainder, "@")
+	if lastAtIdx == -1 {
+		return raw
+	}
+
+	userPass := remainder[:lastAtIdx]
+	hostDb := remainder[lastAtIdx+1:]
+
+	colonIdx := strings.Index(userPass, ":")
+	if colonIdx == -1 {
+		return raw
+	}
+
+	user := userPass[:colonIdx]
+	pass := userPass[colonIdx+1:]
+
+	// URL-escape password if unescaped
+	escapedPass := url.QueryEscape(pass)
+	escapedPass = strings.ReplaceAll(escapedPass, "+", "%20")
+
+	return fmt.Sprintf("%s%s:%s@%s", schema, user, escapedPass, hostDb)
+}
 
 func main() {
 	// 1. Load .env if present
@@ -41,7 +79,9 @@ func main() {
 
 	// 3. PostgreSQL Connection Pool
 	pgConnString := os.Getenv("DATABASE_URL")
-	if pgConnString == "" {
+	if pgConnString != "" {
+		pgConnString = sanitizeDatabaseURL(pgConnString)
+	} else {
 		pgHost := os.Getenv("PG_HOST")
 		if pgHost == "" {
 			pgHost = "postgres-databases-sharedpostgres-kooq42"
@@ -64,8 +104,10 @@ func main() {
 			pgSSL = "disable"
 		}
 
+		escapedPass := url.QueryEscape(pgPass)
+		escapedPass = strings.ReplaceAll(escapedPass, "+", "%20")
 		pgConnString = fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s",
-			pgUser, pgPass, pgHost, pgPort, pgDB, pgSSL)
+			pgUser, escapedPass, pgHost, pgPort, pgDB, pgSSL)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
