@@ -31,16 +31,13 @@ RUN apk add --no-cache ca-certificates tzdata wget
 
 WORKDIR /app
 
-# Run as non-root user for security
-RUN addgroup -S mindzed && adduser -S mindzed -G mindzed
-RUN mkdir -p /app/data && chown -R mindzed:mindzed /app
+# Create data directory for whitelist persistence
+RUN mkdir -p /app/data
 
 # Copy compiled binary from builder
 COPY --from=builder /bin/mindzed-agent /app/mindzed-agent
 
 ENV WHITELIST_FILE=/app/data/whitelist.json
-
-USER mindzed
 
 EXPOSE 8080
 
