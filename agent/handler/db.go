@@ -425,6 +425,64 @@ func (m *DBManager) DeleteDatabase(c *gin.Context) {
 	})
 }
 
+// ResetDatabasePassword rotates/resets the database owner user's password with a fresh CSPRNG password
+func (m *DBManager) ResetDatabasePassword(c *gin.Context) {
+	if m.Pool == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "PostgreSQL pool is not connected"})
+		return
+	}
+
+	dbName := strings.TrimSpace(c.Param("name"))
+	if !sanitizeIdentifier(dbName) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid database name format"})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
+	defer cancel()
+
+	// Find the database owner
+	var owner string
+	ownerSQL := `
+		SELECT COALESCE(pg_catalog.pg_get_userbyid(datdba), '') 
+		FROM pg_catalog.pg_database 
+		WHERE datname = $1;
+	`
+	if err := m.Pool.QueryRow(ctx, ownerSQL, dbName).Scan(&owner); err != nil || owner == "" {
+		c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("Database '%s' not found", dbName)})
+		return
+	}
+
+	// Generate fresh 32-character cryptographic password
+	newPassword, err := generateSecurePassword(32)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate password"})
+		return
+	}
+
+	// Update user password in PostgreSQL
+	alterSQL := fmt.Sprintf(`ALTER USER "%s" WITH ENCRYPTED PASSWORD '%s'`, owner, newPassword)
+	if _, err := m.Pool.Exec(ctx, alterSQL); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to update password: %v", err)})
+		return
+	}
+
+	connections := ConnectionURLs{
+		DokployInternal: fmt.Sprintf("postgresql://%s:%s@%s:%s/%s", owner, newPassword, m.InternalHost, m.Port, dbName),
+		SSHTunnel:       fmt.Sprintf("postgresql://%s:%s@localhost:%s/%s", owner, newPassword, m.SSHPort, dbName),
+		ExternalVercel:  fmt.Sprintf("postgresql://%s:%s@%s:%s/%s?sslmode=disable", owner, newPassword, m.ExternalHost, m.PGBouncerPort, dbName),
+	}
+
+	c.JSON(http.StatusOK, CreateDatabaseResponse{
+		Success:     true,
+		Database:    dbName,
+		Username:    owner,
+		Password:    newPassword,
+		Connections: connections,
+		CreatedAt:   time.Now().UTC().Format(time.RFC3339),
+	})
+}
+
 // ==========================================
 // GitHub Whitelist & First-User Admin Logic (JSON File Persistence)
 // Zero database tables created in PostgreSQL!

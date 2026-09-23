@@ -18,7 +18,8 @@ import {
   fetchDatabases, 
   deleteDatabaseApi, 
   DatabaseSummary, 
-  CreateDatabaseResponse 
+  CreateDatabaseResponse,
+  getSavedDatabaseCredentials
 } from "@/lib/agent-client";
 import CreateDbModal from "@/components/db/CreateDbModal";
 import ConnectionCard from "@/components/db/ConnectionCard";
@@ -97,33 +98,39 @@ export default function DatabasesPage() {
 
   // Open existing DB connection card - Uses dynamic URLs provided directly by Agent!
   const handleOpenExistingConnection = (db: DatabaseSummary) => {
-    if (db.connections) {
-      setConnectionModalData({
-        success: true,
-        database: db.name,
-        username: db.owner,
-        password: "•••(managed)•••",
-        connections: db.connections,
-        created_at: new Date().toISOString(),
-      });
-      return;
-    }
+    const saved = getSavedDatabaseCredentials(db.name);
+    const password = saved?.password || "•••(managed)•••";
+    const hasRealPassword = password !== "•••(managed)•••";
 
     const intHost = clusterInfo?.internal_host || "postgres";
-    const extHost = clusterInfo?.external_host || "vps-host";
+    const extHost = clusterInfo?.external_host || "129.154.34.1";
     const sshPort = clusterInfo?.ssh_port || "5433";
     const port = clusterInfo?.port || "5432";
     const pgbouncerPort = clusterInfo?.pgbouncer_port || "6432";
+
+    let dokployUrl = db.connections?.dokploy_internal || `postgresql://${db.owner}:${hasRealPassword ? password : "••••••••"}@${intHost}:${port}/${db.name}`;
+    let sshUrl = db.connections?.ssh_tunnel || `postgresql://${db.owner}:${hasRealPassword ? password : "••••••••"}@localhost:${sshPort}/${db.name}`;
+    let externalUrl = db.connections?.external_vercel || `postgresql://${db.owner}:${hasRealPassword ? password : "••••••••"}@${extHost}:${pgbouncerPort}/${db.name}?sslmode=disable`;
+
+    // CRITICAL: Always ensure external URL uses PgBouncer port 6432, replacing any stale 5432
+    externalUrl = externalUrl.replace(/:5432\//, `:${pgbouncerPort}/`);
+
+    // If we have saved the real password in local vault, replace the masked •••••••• with real password
+    if (hasRealPassword) {
+      dokployUrl = dokployUrl.replace(/:••••••••@/, `:${password}@`).replace(/:[^:@]+@/, `:${password}@`);
+      sshUrl = sshUrl.replace(/:••••••••@/, `:${password}@`).replace(/:[^:@]+@/, `:${password}@`);
+      externalUrl = externalUrl.replace(/:••••••••@/, `:${password}@`).replace(/:[^:@]+@/, `:${password}@`);
+    }
 
     setConnectionModalData({
       success: true,
       database: db.name,
       username: db.owner,
-      password: "•••(managed)•••",
+      password: password,
       connections: {
-        dokploy_internal: `postgresql://${db.owner}:••••••••@${intHost}:${port}/${db.name}`,
-        ssh_tunnel: `postgresql://${db.owner}:••••••••@localhost:${sshPort}/${db.name}`,
-        external_vercel: `postgresql://${db.owner}:••••••••@${extHost}:${pgbouncerPort}/${db.name}?sslmode=disable`,
+        dokploy_internal: dokployUrl,
+        ssh_tunnel: sshUrl,
+        external_vercel: externalUrl,
       },
       created_at: new Date().toISOString(),
     });

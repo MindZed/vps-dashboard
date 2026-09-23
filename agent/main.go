@@ -235,6 +235,7 @@ func main() {
 		v1.GET("/databases", dbManager.ListDatabases)
 		v1.POST("/databases", dbManager.CreateDatabase)
 		v1.DELETE("/databases/:name", dbManager.DeleteDatabase)
+		v1.POST("/databases/:name/reset-password", dbManager.ResetDatabasePassword)
 
 		// GitHub Whitelist & First-User Admin Management
 		v1.GET("/auth/whitelist", dbManager.GetWhitelist)

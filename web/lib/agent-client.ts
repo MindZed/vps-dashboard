@@ -389,6 +389,7 @@ export async function createDatabaseApi(
 
       if (res.ok) {
         const data = await res.json();
+        saveDatabaseCredentials(data.database, data.username, data.password);
         return { data, isMock: false };
       }
       const err = await res.json().catch(() => ({ error: "Request failed" }));
@@ -459,6 +460,76 @@ export async function deleteDatabaseApi(name: string): Promise<{ success: boolea
 
   mockDatabases = mockDatabases.filter((d) => d.name !== name);
   return { success: true, isMock: true };
+}
+
+export async function resetDatabasePasswordApi(
+  name: string
+): Promise<{ data: CreateDatabaseResponse; isMock: boolean }> {
+  const config = getAgentConfig();
+
+  if (!config.forceDemo) {
+    try {
+      const res = await fetch(getApiEndpoint(`databases/${encodeURIComponent(name)}/reset-password`), {
+        method: "POST",
+        headers: getHeaders(),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        saveDatabaseCredentials(data.database, data.username, data.password);
+        return { data, isMock: false };
+      }
+      const err = await res.json().catch(() => ({ error: "Request failed" }));
+      throw new Error(err.error || "Failed to reset password");
+    } catch (e: unknown) {
+      const errMsg = e instanceof Error ? e.message : String(e);
+      if (!errMsg.includes("fetch")) {
+        throw e;
+      }
+    }
+  }
+
+  const newPassword = generateSecretKey().slice(0, 32);
+  const mockResp: CreateDatabaseResponse = {
+    success: true,
+    database: name,
+    username: `usr_${name.replace(/^db_/, "").replace(/_[^_]+$/, "")}`,
+    password: newPassword,
+    connections: {
+      dokploy_internal: `postgresql://mock:${newPassword}@postgres:5432/${name}`,
+      ssh_tunnel: `postgresql://mock:${newPassword}@localhost:5433/${name}`,
+      external_vercel: `postgresql://mock:${newPassword}@vps-host:6432/${name}?sslmode=disable`,
+    },
+    created_at: new Date().toISOString(),
+  };
+  saveDatabaseCredentials(name, mockResp.username, newPassword);
+  return { data: mockResp, isMock: true };
+}
+
+const VAULT_KEY = "mindzed_db_vault";
+
+export function saveDatabaseCredentials(database: string, username: string, password: string) {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = localStorage.getItem(VAULT_KEY);
+    const vault = raw ? JSON.parse(raw) : {};
+    vault[database] = { username, password, savedAt: new Date().toISOString() };
+    localStorage.setItem(VAULT_KEY, JSON.stringify(vault));
+  } catch (e) {
+    console.warn("Failed to save credentials to vault", e);
+  }
+}
+
+export function getSavedDatabaseCredentials(database: string): { username: string; password?: string } | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(VAULT_KEY);
+    if (!raw) return null;
+    const vault = JSON.parse(raw);
+    return vault[database] || null;
+  } catch {
+    return null;
+  }
 }
 
 // ==========================================
