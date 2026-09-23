@@ -196,13 +196,42 @@ export async function checkAgentHealth(): Promise<{
     };
   }
 
+  // 1. Attempt direct client-to-agent measurement first to bypass Vercel serverless proxy overhead
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
+
+    const start = performance.now();
+    const res = await fetch(`${config.baseUrl}/health`, {
+      signal: controller.signal,
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+      mode: "cors",
+    });
+    clearTimeout(timeoutId);
+
+    const latencyMs = Math.round(performance.now() - start);
+    if (res.ok) {
+      const data = await res.json();
+      return {
+        ok: true,
+        status: data.status || "ok",
+        latencyMs,
+        postgres: data.postgres || "connected",
+        isMock: false,
+      };
+    }
+  } catch {
+    // If direct cross-origin fetch is blocked, fallback to serverless proxy
+  }
+
+  // 2. Fallback to Next.js server proxy if direct fetch is blocked
   const start = performance.now();
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 4000);
 
-    const url = typeof window !== "undefined" ? "/api/proxy-health" : `${config.baseUrl}/health`;
-    const res = await fetch(url, {
+    const res = await fetch("/api/proxy-health", {
       signal: controller.signal,
       headers: { Accept: "application/json" },
       cache: "no-store",
