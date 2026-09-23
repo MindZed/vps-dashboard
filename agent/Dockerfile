@@ -10,12 +10,11 @@ WORKDIR /app
 # Install git and ca-certificates
 RUN apk add --no-cache git ca-certificates tzdata
 
-# Cache dependencies
-COPY go.mod go.sum* ./
-RUN go mod download || true
-
-# Copy source code
+# Copy source code and dependencies
 COPY . .
+
+# Download dependencies and ensure go.sum is complete
+RUN go mod tidy && go mod download
 
 # Target architecture (default to arm64 for Oracle Ampere VPS, or host TARGETARCH)
 ARG TARGETOS=linux
