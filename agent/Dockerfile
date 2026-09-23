@@ -3,7 +3,7 @@
 # -------------------------------------------------------------
 # Stage 1: Build binary (optimized for ARM64 Oracle Ampere & AMD64)
 # -------------------------------------------------------------
-FROM --platform=$BUILDPLATFORM golang:1.22-alpine AS builder
+FROM golang:1.22-alpine AS builder
 
 WORKDIR /app
 
@@ -16,11 +16,8 @@ COPY . .
 # Download dependencies and ensure go.sum is complete
 RUN go mod tidy && go mod download
 
-# Target architecture (default to arm64 for Oracle Ampere VPS, or host TARGETARCH)
-ARG TARGETOS=linux
-ARG TARGETARCH=arm64
-
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build \
+# Build binary natively for host CPU (auto-detects ARM64 or AMD64)
+RUN CGO_ENABLED=0 go build \
     -ldflags="-s -w -X main.version=1.0.0" \
     -o /bin/mindzed-agent \
     main.go
