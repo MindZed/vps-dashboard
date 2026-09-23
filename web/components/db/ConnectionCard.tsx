@@ -34,6 +34,7 @@ export default function ConnectionCard({ data, onClose }: ConnectionCardProps) {
   const [isResetting, setIsResetting] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
   const [resetSuccess, setResetSuccess] = useState(false);
+  const [isPrismaMode, setIsPrismaMode] = useState(true);
 
   useEffect(() => {
     if (data) {
@@ -132,17 +133,27 @@ export default function ConnectionCard({ data, onClose }: ConnectionCardProps) {
       label: "Pooled / Vercel (PgBouncer)",
       portBadge: "6432",
       icon: Globe,
-      url: cardData.connections.external_vercel.replace(/:5432\//, ":6432/"),
-      desc: "Connect serverless apps (Vercel, Next.js, AWS Lambda, Prisma) through high-performance PgBouncer on port 6432.",
+      url: (() => {
+        const raw = cardData.connections.external_vercel.replace(/:5432\//, ":6432/");
+        if (!isPrismaMode) return raw;
+        return raw.includes("?") ? `${raw}&pgbouncer=true` : `${raw}?pgbouncer=true`;
+      })(),
+      desc: "Connect serverless apps (Vercel, Next.js, AWS Lambda, Prisma, Drizzle) through high-performance PgBouncer on port 6432.",
       helperCmd: null,
-      tip: "PgBouncer reuses connections in transaction pooling mode. Direct port 5432 is blocked externally for security.",
+      tip: isPrismaMode
+        ? "Prisma mode is ON (&pgbouncer=true appended). Disables prepared statements across pooled connections."
+        : "PgBouncer reuses connections in transaction pooling mode. Direct port 5432 is blocked externally for security.",
     },
   ] as const;
 
   const currentTab = tabs.find((t) => t.id === activeTab) || tabs[0];
 
-  const envBlock = `# MindZed PostgreSQL (${cardData.database}) - ${currentTab.label}
-DATABASE_URL="${currentTab.url}"
+  const directUrlSnippet = (activeTab === "external" && isPrismaMode)
+    ? `\n# Direct URL for Prisma migrations (npx prisma migrate dev via local SSH tunnel)\nDIRECT_URL="${cardData.connections.ssh_tunnel}"`
+    : "";
+
+  const envBlock = `# MindZed PostgreSQL (${cardData.database}) - ${currentTab.label}${isPrismaMode && activeTab === "external" ? " (Prisma Ready)" : ""}
+DATABASE_URL="${currentTab.url}"${directUrlSnippet}
 PG_HOST="${currentTab.id === 'dokploy' ? 'postgres-databases-sharedpostgres-kooq42' : currentTab.id === 'ssh' ? 'localhost' : extractedExtHost}"
 PG_PORT="${currentTab.portBadge}"
 PG_USER="${cardData.username}"
@@ -315,6 +326,42 @@ PG_DATABASE="${cardData.database}"
               <div className="px-3 py-1.5 rounded-lg bg-zinc-900/80 border border-zinc-800/80 text-[11px] text-zinc-400 flex items-center gap-2 font-mono">
                 <span className="text-emerald-400 font-bold">INFO:</span>
                 <span>{currentTab.tip}</span>
+              </div>
+            )}
+
+            {/* Prisma Mode Switcher (Active on External Tab) */}
+            {activeTab === "external" && (
+              <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-[#141A29] border border-indigo-500/30">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" />
+                  <div>
+                    <span className="text-xs font-semibold text-white">Prisma Friendly URL</span>
+                    <span className="text-[10px] text-zinc-400 font-mono ml-2">
+                      adds &pgbouncer=true
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className={`text-[11px] font-mono font-medium ${isPrismaMode ? "text-emerald-400" : "text-zinc-500"}`}>
+                    {isPrismaMode ? "Prisma Mode (ON)" : "Standard (OFF)"}
+                  </span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={isPrismaMode}
+                    onClick={() => setIsPrismaMode(!isPrismaMode)}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      isPrismaMode ? "bg-emerald-500" : "bg-zinc-700"
+                    }`}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                        isPrismaMode ? "translate-x-4" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                </div>
               </div>
             )}
 
