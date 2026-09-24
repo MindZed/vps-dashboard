@@ -1,6 +1,6 @@
 {
-  "name": "MindZed Hub - VPS & Database Cloud",
-  "short_name": "MindZed Hub",
+  "name": "ZeonCloud - VPS & Database Cloud",
+  "short_name": "ZeonCloud",
   "description": "Neon-style PostgreSQL Database Provisioner, Oracle Ampere VPS Vitals & Infrastructure Watchdog",
   "start_url": "/",
   "display": "standalone",

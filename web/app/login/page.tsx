@@ -64,7 +64,7 @@ function LoginContent() {
             <div className="inline-flex items-center justify-center h-12 w-12 rounded-xl bg-zinc-800 border border-zinc-700 text-white mb-2 shadow-inner">
               <Shield className="h-6 w-6 text-zinc-200" />
             </div>
-            <h1 className="text-2xl font-bold tracking-tight text-white">MindZed Hub</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-white">ZeonCloud</h1>
             <p className="text-xs text-zinc-400">
               Oracle VPS Telemetry & PostgreSQL Cloud Management
             </p>
@@ -162,7 +162,7 @@ function LoginContent() {
 
           {/* Footer info */}
           <div className="pt-2 text-center text-[11px] text-zinc-500 border-t border-zinc-850">
-            <span>MindZed Infrastructure Services • Oracle Linux Ampere</span>
+            <span>ZeonCloud Infrastructure Services • Oracle Linux Ampere</span>
           </div>
         </div>
       </div>

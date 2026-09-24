@@ -179,12 +179,15 @@ export default function Navbar() {
           {/* Logo & Brand */}
           <div className="flex items-center gap-6">
             <Link href="/" className="flex items-center gap-2.5 group">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-900 border border-zinc-700/80 text-white group-hover:border-zinc-500 transition-colors">
-                <Terminal className="h-4 w-4 text-white" />
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-black border border-zinc-800 text-white group-hover:border-zinc-600 transition-colors shadow-sm">
+                <svg viewBox="0 0 512 512" className="w-4 h-4" fill="none">
+                  <path d="M 168 214 Q 256 214 344 214 C 358 214, 362 222, 350 234 L 174 316 C 160 326, 168 334, 184 334 L 344 334" stroke="#ffffff" strokeWidth="52" strokeLinecap="round" strokeLinejoin="round" />
+                  <circle cx="344" cy="162" r="20" fill="#ffffff" />
+                </svg>
               </div>
               <div className="flex flex-col">
-                <span className="font-bold text-xs tracking-wider text-white flex items-center gap-1.5 font-mono">
-                  MINDZED <span className="text-[10px] text-zinc-400 font-semibold px-1 py-0.2 rounded bg-zinc-800 border border-zinc-700">HUB</span>
+                <span className="font-bold text-xs tracking-wider text-white flex items-center gap-1 font-mono">
+                  ZEON<span className="text-[10px] text-zinc-400 font-semibold px-1 py-0.2 rounded bg-zinc-800 border border-zinc-700">CLOUD</span>
                 </span>
                 <span className="text-[9px] text-zinc-500 tracking-wider">ORACLE VPS & DB</span>
               </div>

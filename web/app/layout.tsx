@@ -4,11 +4,14 @@ import Navbar from "@/components/Navbar";
 import SessionProvider from "@/components/SessionProvider";
 
 export const metadata: Metadata = {
-  title: "MindZed Hub | Oracle VPS Vitals & Neon-Style DB Cloud",
-  description: "Minimalist dashboard for monitoring Oracle Linux Ampere VPS, provisioning isolated PostgreSQL databases, and tracking Uptime Kuma heartbeats.",
+  title: "ZeonCloud | Oracle VPS Vitals & Neon-Style Postgres Cloud",
+  description: "Open-source control plane for monitoring Oracle Linux Ampere VPS, provisioning isolated PostgreSQL databases, and tracking Uptime Kuma heartbeats.",
   manifest: "/manifest.json",
   icons: {
-    icon: "/icons/icon.svg",
+    icon: [
+      { url: "/icons/icon.svg", type: "image/svg+xml" },
+      { url: "/favicon.ico", sizes: "any" },
+    ],
     apple: "/icons/icon-192.png",
   },
 };
@@ -29,6 +32,7 @@ export default function RootLayout({
     <html lang="en" className="dark h-full antialiased selection:bg-white/20 selection:text-white">
       <head>
         <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
+        <link rel="icon" href="/favicon.ico" sizes="any" />
         <link rel="apple-touch-icon" href="/icons/icon-192.png" />
       </head>
       <body className="min-h-full flex flex-col bg-[#09090b] text-zinc-100 bg-grid-pattern">
@@ -46,7 +50,7 @@ export default function RootLayout({
         <footer className="border-t border-zinc-850/80 bg-zinc-950/60 py-6 mt-12 text-xs text-zinc-500">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-              <span className="font-semibold text-zinc-300">MindZed Hub</span>
+              <span className="font-semibold text-zinc-300">ZeonCloud</span>
               <span>•</span>
               <span>Open-Source Oracle Linux Ampere Telemetry & DB Manager</span>
             </div>
