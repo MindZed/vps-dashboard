@@ -95,23 +95,62 @@ func NewDBManager(pool *pgxpool.Pool) *DBManager {
 // Helper methods for thread-safe JSON file whitelist persistence
 func (m *DBManager) readWhitelistFile() (*WhitelistData, error) {
 	m.whitelistMu.RLock()
-	defer m.whitelistMu.RUnlock()
-
 	data, err := os.ReadFile(m.WhitelistFile)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return &WhitelistData{Admin: "", Users: []WhitelistUser{}}, nil
-		}
-		return nil, err
-	}
+	m.whitelistMu.RUnlock()
 
 	var wl WhitelistData
-	if err := json.Unmarshal(data, &wl); err != nil {
-		return &WhitelistData{Admin: "", Users: []WhitelistUser{}}, nil
+	if err != nil {
+		if os.IsNotExist(err) {
+			wl = WhitelistData{Admin: "", Users: []WhitelistUser{}}
+		} else {
+			return nil, err
+		}
+	} else {
+		if err := json.Unmarshal(data, &wl); err != nil {
+			wl = WhitelistData{Admin: "", Users: []WhitelistUser{}}
+		}
 	}
 	if wl.Users == nil {
 		wl.Users = []WhitelistUser{}
 	}
+
+	// Environment variable auto-seed fallback:
+	// If whitelist is wiped (e.g. container recreation without mounted volume),
+	// automatically seed primary admin from ADMIN_USERNAME or ALLOWED_GITHUB_USERS.
+	if wl.Admin == "" {
+		seedAdmin := os.Getenv("ADMIN_USERNAME")
+		if seedAdmin == "" {
+			seedAdmin = os.Getenv("ALLOWED_GITHUB_USERS")
+		}
+		if seedAdmin != "" {
+			admins := strings.Split(seedAdmin, ",")
+			primary := strings.ToLower(strings.TrimPrefix(strings.TrimSpace(admins[0]), "@"))
+			if primary != "" {
+				wl.Admin = primary
+				for _, a := range admins {
+					cleanA := strings.ToLower(strings.TrimPrefix(strings.TrimSpace(a), "@"))
+					if cleanA != "" {
+						found := false
+						for _, u := range wl.Users {
+							if strings.EqualFold(u.Username, cleanA) {
+								found = true
+								break
+							}
+						}
+						if !found {
+							wl.Users = append(wl.Users, WhitelistUser{
+								Username: cleanA,
+								Role:     "admin",
+								AddedAt:  time.Now().UTC().Format(time.RFC3339),
+							})
+						}
+					}
+				}
+				_ = m.writeWhitelistFile(&wl)
+			}
+		}
+	}
+
 	return &wl, nil
 }
 

@@ -40,6 +40,9 @@ RUN chmod +x /app/mindzed-agent
 
 ENV WHITELIST_FILE=/app/data/whitelist.json
 
+# Declare persistent volume so container updates never destroy whitelist.json
+VOLUME ["/app/data"]
+
 EXPOSE 8080
 EXPOSE 8050
 
