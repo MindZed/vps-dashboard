@@ -15,7 +15,8 @@ import {
   Database,
   RefreshCw,
   AlertCircle,
-  CheckCircle2
+  CheckCircle2,
+  Zap
 } from "lucide-react";
 import { CreateDatabaseResponse, resetDatabasePasswordApi } from "@/lib/agent-client";
 
@@ -35,6 +36,7 @@ export default function ConnectionCard({ data, onClose }: ConnectionCardProps) {
   const [resetError, setResetError] = useState<string | null>(null);
   const [resetSuccess, setResetSuccess] = useState(false);
   const [isPrismaMode, setIsPrismaMode] = useState(true);
+  const [isServerlessMode, setIsServerlessMode] = useState(true);
 
   useEffect(() => {
     if (data) {
@@ -116,7 +118,7 @@ export default function ConnectionCard({ data, onClose }: ConnectionCardProps) {
       url: cardData.connections.dokploy_internal,
       desc: "For microservices deployed inside the Docker Swarm network on Oracle VPS (direct internal port 5432).",
       helperCmd: null,
-      tip: "Use for Dokploy backend containers and microservices on the internal Docker network.",
+      tip: "Non-Serverless: Long-running Dokploy containers do NOT need &connection_limit=1. Let Prisma manage its standard connection pool (~10 connections).",
     },
     {
       id: "ssh",
@@ -135,14 +137,38 @@ export default function ConnectionCard({ data, onClose }: ConnectionCardProps) {
       icon: Globe,
       url: (() => {
         const raw = cardData.connections.external_vercel.replace(/:5432\//, ":6432/");
-        if (!isPrismaMode) return raw;
-        return raw.includes("?") ? `${raw}&pgbouncer=true` : `${raw}?pgbouncer=true`;
+        const [base, query] = raw.split("?");
+        const params = new URLSearchParams(query || "");
+
+        if (isPrismaMode) {
+          params.set("pgbouncer", "true");
+        } else {
+          params.delete("pgbouncer");
+        }
+
+        if (isServerlessMode) {
+          params.set("connection_limit", "1");
+        } else {
+          params.delete("connection_limit");
+        }
+
+        const qs = params.toString();
+        return qs ? `${base}?${qs}` : base;
       })(),
       desc: "Connect serverless apps (Vercel, Next.js, AWS Lambda, Prisma, Drizzle) through high-performance PgBouncer on port 6432.",
       helperCmd: null,
-      tip: isPrismaMode
-        ? "Prisma mode is ON (&pgbouncer=true appended). Disables prepared statements across pooled connections."
-        : "PgBouncer reuses connections in transaction pooling mode. Direct port 5432 is blocked externally for security.",
+      tip: (() => {
+        if (isPrismaMode && isServerlessMode) {
+          return "Serverless + Prisma Mode: Appends &pgbouncer=true & &connection_limit=1 (ideal for Vercel, Next.js, & AWS Lambda).";
+        }
+        if (isPrismaMode && !isServerlessMode) {
+          return "Dedicated + Prisma Mode: Appends &pgbouncer=true (no connection limit, allows full pool on persistent servers).";
+        }
+        if (!isPrismaMode && isServerlessMode) {
+          return "Serverless Mode: Appends &connection_limit=1 for serverless functions with standard SQL/Drizzle drivers.";
+        }
+        return "Standard Pooled: Clean transaction-pooled connection string (port 6432).";
+      })(),
     },
   ] as const;
 
@@ -152,7 +178,7 @@ export default function ConnectionCard({ data, onClose }: ConnectionCardProps) {
     ? `\n# Direct URL for Prisma migrations (npx prisma migrate dev via local SSH tunnel)\nDIRECT_URL="${cardData.connections.ssh_tunnel}"`
     : "";
 
-  const envBlock = `# MindZed PostgreSQL (${cardData.database}) - ${currentTab.label}${isPrismaMode && activeTab === "external" ? " (Prisma Ready)" : ""}
+  const envBlock = `# MindZed PostgreSQL (${cardData.database}) - ${currentTab.label}${isPrismaMode && activeTab === "external" ? " (Prisma Ready)" : ""}${isServerlessMode && activeTab === "external" ? " (Serverless)" : ""}
 DATABASE_URL="${currentTab.url}"${directUrlSnippet}
 PG_HOST="${currentTab.id === 'dokploy' ? 'postgres-databases-sharedpostgres-kooq42' : currentTab.id === 'ssh' ? 'localhost' : extractedExtHost}"
 PG_PORT="${currentTab.portBadge}"
@@ -176,7 +202,7 @@ PG_DATABASE="${cardData.database}"
           initial={{ opacity: 0, scale: 0.96, y: 10 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.96, y: 10 }}
-          className="relative w-full max-w-2xl rounded-2xl bg-[#111114] border border-zinc-750 p-6 shadow-2xl z-10 overflow-hidden"
+          className="relative w-full max-w-2xl max-h-[92vh] flex flex-col rounded-2xl bg-[#111114] border border-zinc-750 p-6 shadow-2xl z-10 overflow-y-auto scrollbar-thin"
         >
           {/* Header Banner */}
           <div className="flex items-start justify-between pb-4 border-b border-zinc-800">
@@ -329,38 +355,91 @@ PG_DATABASE="${cardData.database}"
               </div>
             )}
 
-            {/* Prisma Mode Switcher (Active on External Tab) */}
+            {/* Configuration Switches (Active on External Tab) */}
             {activeTab === "external" && (
-              <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-[#141A29] border border-indigo-500/30">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" />
-                  <div>
-                    <span className="text-xs font-semibold text-white">Prisma Friendly URL</span>
-                    <span className="text-[10px] text-zinc-400 font-mono ml-2">
-                      adds &pgbouncer=true
+              <div className="space-y-2">
+                {/* Serverless Switch */}
+                <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-[#181622] to-[#121217] border border-amber-500/25">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-1 rounded-md bg-amber-500/10 text-amber-400">
+                      <Zap className="h-3.5 w-3.5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-white">Serverless Mode (Vercel / Lambda)</span>
+                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 font-medium">
+                          &connection_limit=1
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-zinc-400 mt-0.5">
+                        {isServerlessMode
+                          ? "Caps 1 connection per ephemeral instance to prevent connection spikes"
+                          : "Dedicated / Long-running server mode (allows standard pooled connections)"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className={`text-[11px] font-mono font-medium ${isServerlessMode ? "text-amber-400" : "text-zinc-500"}`}>
+                      {isServerlessMode ? "Serverless (ON)" : "Dedicated (OFF)"}
                     </span>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={isServerlessMode}
+                      onClick={() => setIsServerlessMode(!isServerlessMode)}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        isServerlessMode ? "bg-amber-500" : "bg-zinc-700"
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                          isServerlessMode ? "translate-x-4" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <span className={`text-[11px] font-mono font-medium ${isPrismaMode ? "text-emerald-400" : "text-zinc-500"}`}>
-                    {isPrismaMode ? "Prisma Mode (ON)" : "Standard (OFF)"}
-                  </span>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={isPrismaMode}
-                    onClick={() => setIsPrismaMode(!isPrismaMode)}
-                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                      isPrismaMode ? "bg-emerald-500" : "bg-zinc-700"
-                    }`}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
-                        isPrismaMode ? "translate-x-4" : "translate-x-0"
+                {/* Prisma Switch */}
+                <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-[#141A29] to-[#121217] border border-indigo-500/25">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse ml-1" />
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-white">Prisma Friendly URL</span>
+                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-300 font-medium">
+                          &pgbouncer=true
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-zinc-400 mt-0.5">
+                        {isPrismaMode
+                          ? "Disables prepared statements across pooled PgBouncer transactions"
+                          : "Standard query parameters for Drizzle, Kysely, or raw pg drivers"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className={`text-[11px] font-mono font-medium ${isPrismaMode ? "text-indigo-400" : "text-zinc-500"}`}>
+                      {isPrismaMode ? "Prisma Mode (ON)" : "Standard (OFF)"}
+                    </span>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={isPrismaMode}
+                      onClick={() => setIsPrismaMode(!isPrismaMode)}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        isPrismaMode ? "bg-indigo-500" : "bg-zinc-700"
                       }`}
-                    />
-                  </button>
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                          isPrismaMode ? "translate-x-4" : "translate-x-0"
+                        }`}
+                      />
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
