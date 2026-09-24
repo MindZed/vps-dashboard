@@ -130,10 +130,11 @@ export default function Navbar() {
   };
 
   const handleClaimAdminRole = async (username: string) => {
-    if (!username.trim()) return;
-    const res = await claimAdmin(username.trim());
+    const cleanUser = username.trim().replace(/^@/, "");
+    if (!cleanUser) return;
+    const res = await claimAdmin(cleanUser);
     if (res.success) {
-      setWhitelistMsg(`Claimed @${username} as Primary Admin!`);
+      setWhitelistMsg(`Claimed @${cleanUser} as Primary Admin!`);
       loadWhitelist();
     } else {
       setWhitelistMsg(res.error || "Claim failed");
@@ -142,13 +143,14 @@ export default function Navbar() {
 
   const handleAddFriend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newUsername.trim()) return;
+    const cleanUser = newUsername.trim().replace(/^@/, "");
+    if (!cleanUser) return;
     setIsAddingUser(true);
-    const res = await addWhitelistUser(newUsername.trim(), "member");
+    const res = await addWhitelistUser(cleanUser, "member");
     setIsAddingUser(false);
     if (res.success) {
       setNewUsername("");
-      setWhitelistMsg(`Added @${newUsername.trim()} to whitelist`);
+      setWhitelistMsg(`Added @${cleanUser} to whitelist`);
       loadWhitelist();
     } else {
       setWhitelistMsg(res.error || "Failed to add user");

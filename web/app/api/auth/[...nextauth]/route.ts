@@ -58,11 +58,13 @@ export const authOptions: AuthOptions = {
       const githubUsername = (profile as { login?: string })?.login || user.name || "";
       if (!githubUsername) return false;
 
+      const cleanGithubUser = githubUsername.replace(/^@/, "").toLowerCase();
+
       // 1. Check if username is in static ALLOWED_GITHUB_USERS env (if provided)
       const allowedEnv = process.env.ALLOWED_GITHUB_USERS;
       if (allowedEnv) {
-        const allowedList = allowedEnv.split(",").map((u) => u.trim().toLowerCase());
-        if (allowedList.includes(githubUsername.toLowerCase())) {
+        const allowedList = allowedEnv.split(",").map((u) => u.trim().replace(/^@/, "").toLowerCase());
+        if (allowedList.includes(cleanGithubUser)) {
           return true;
         }
       }
@@ -82,8 +84,9 @@ export const authOptions: AuthOptions = {
         if (res.ok) {
           const data = await res.json();
 
+          const adminName = (data.admin || "").replace(/^@/, "").toLowerCase();
           // 2a. If user is the designated primary admin, allow
-          if (data.admin && data.admin.toLowerCase() === githubUsername.toLowerCase()) {
+          if (adminName && adminName === cleanGithubUser) {
             return true;
           }
 
@@ -95,14 +98,14 @@ export const authOptions: AuthOptions = {
                 "Content-Type": "application/json",
                 "X-Agent-Secret": AGENT_SECRET,
               },
-              body: JSON.stringify({ username: githubUsername }),
+              body: JSON.stringify({ username: cleanGithubUser }),
             });
             return true;
           }
 
           // 2c. Check if user is on the approved team whitelist
-          const isWhitelisted = data.users.some(
-            (u: { username: string }) => u.username.toLowerCase() === githubUsername.toLowerCase()
+          const isWhitelisted = (data.users || []).some(
+            (u: { username: string }) => (u.username || "").replace(/^@/, "").toLowerCase() === cleanGithubUser
           );
           if (isWhitelisted) {
             return true;

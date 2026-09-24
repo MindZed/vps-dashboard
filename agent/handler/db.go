@@ -513,7 +513,7 @@ func (m *DBManager) ClaimAdmin(c *gin.Context) {
 		return
 	}
 
-	username := strings.ToLower(strings.TrimSpace(body.Username))
+	username := strings.ToLower(strings.TrimPrefix(strings.TrimSpace(body.Username), "@"))
 	wl, err := m.readWhitelistFile()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to read whitelist: %v", err)})
@@ -566,7 +566,7 @@ func (m *DBManager) AddWhitelistUser(c *gin.Context) {
 		return
 	}
 
-	username := strings.ToLower(strings.TrimSpace(body.Username))
+	username := strings.ToLower(strings.TrimPrefix(strings.TrimSpace(body.Username), "@"))
 	role := "member"
 	if body.Role == "admin" {
 		role = "admin"
