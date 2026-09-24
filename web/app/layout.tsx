@@ -4,7 +4,7 @@ import Navbar from "@/components/Navbar";
 import SessionProvider from "@/components/SessionProvider";
 
 export const metadata: Metadata = {
-  title: "ZeonCloud | Oracle VPS Vitals & Neon-Style Postgres Cloud",
+  title: "ZeonCloud | Dashboard",
   description: "Open-source control plane for monitoring Oracle Linux Ampere VPS, provisioning isolated PostgreSQL databases, and tracking Uptime Kuma heartbeats.",
   manifest: "/manifest.json",
   icons: {
