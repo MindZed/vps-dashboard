@@ -35,3 +35,6 @@ yarn-error.log*
 # OS metadata
 .DS_Store
 Thumbs.db
+
+# Local Handoff Docs (Private)
+VPS_INFRASTRUCTURE_HANDOFF.md

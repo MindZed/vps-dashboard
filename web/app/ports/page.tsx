@@ -238,7 +238,7 @@ export default function PortsSecurityPage() {
         </div>
         <p className="leading-relaxed text-zinc-400 text-[11px]">
           Even if a service binds to <code className="text-zinc-300">0.0.0.0</code>, incoming traffic is blocked unless explicitly permitted by both Oracle Cloud VCN Ingress Rules and <code className="text-zinc-300">firewalld</code>. 
-          PostgreSQL should always bind to your internal Docker Swarm network (<code className="text-zinc-300">postgres:5432</code>) or localhost via SSH Tunnel for maximum isolation.
+          PostgreSQL should always bind to your internal Docker Swarm network (<code className="text-zinc-300">postgres-databases-sharedpostgres-kooq42:5432</code>) or localhost via SSH Tunnel for maximum isolation.
         </p>
       </div>
     </div>

@@ -52,8 +52,8 @@ type WhitelistUser struct {
 // NewDBManager initializes a new DBManager with environment variables.
 func NewDBManager(pool *pgxpool.Pool) *DBManager {
 	internalHost := os.Getenv("PG_INTERNAL_HOST")
-	if internalHost == "" {
-		internalHost = "localhost"
+	if internalHost == "" || internalHost == "postgres" || internalHost == "localhost" {
+		internalHost = "postgres-databases-sharedpostgres-kooq42"
 	}
 
 	externalHost := os.Getenv("PG_EXTERNAL_HOST")

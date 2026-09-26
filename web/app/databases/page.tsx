@@ -104,13 +104,15 @@ export default function DatabasesPage() {
     const password = saved?.password || "•••(managed)•••";
     const hasRealPassword = password !== "•••(managed)•••";
 
-    const intHost = clusterInfo?.internal_host || "postgres";
+    const intHost = (clusterInfo?.internal_host && clusterInfo.internal_host !== "postgres") ? clusterInfo.internal_host : "postgres-databases-sharedpostgres-kooq42";
     const extHost = clusterInfo?.external_host || (typeof window !== "undefined" ? window.location.hostname : "vps-host");
     const sshPort = clusterInfo?.ssh_port || "5433";
     const port = clusterInfo?.port || "5432";
     const pgbouncerPort = clusterInfo?.pgbouncer_port || "6432";
 
     let dokployUrl = db.connections?.dokploy_internal || `postgresql://${db.owner}:${hasRealPassword ? password : "••••••••"}@${intHost}:${port}/${db.name}`;
+    // CRITICAL: Always ensure internal Dokploy URL uses the active container service name
+    dokployUrl = dokployUrl.replace(/@postgres:5432\//, `@${intHost}:${port}/`);
     let sshUrl = db.connections?.ssh_tunnel || `postgresql://${db.owner}:${hasRealPassword ? password : "••••••••"}@localhost:${sshPort}/${db.name}`;
     let externalUrl = db.connections?.external_vercel || `postgresql://${db.owner}:${hasRealPassword ? password : "••••••••"}@${extHost}:${pgbouncerPort}/${db.name}?sslmode=disable`;
 
@@ -233,7 +235,7 @@ export default function DatabasesPage() {
           <div className="space-y-0.5">
             <span className="text-[10px] text-zinc-500 font-mono block">INTERNAL DB HOST</span>
             <div className="text-xs font-mono text-zinc-300 truncate max-w-[190px]">
-              {clusterInfo?.internal_host || "postgres"}
+              {clusterInfo?.internal_host && clusterInfo.internal_host !== "postgres" ? clusterInfo.internal_host : "postgres-databases-sharedpostgres-kooq42"}
             </div>
           </div>
           <div className="p-2 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-400">

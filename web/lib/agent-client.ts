@@ -87,7 +87,7 @@ let mockDatabases: DatabaseSummary[] = [
     project: "mindzed_core",
     active_connections: 3,
     connections: {
-      dokploy_internal: "postgresql://usr_mindzed_core:••••••••@postgres:5432/db_mindzed_core_prod",
+      dokploy_internal: "postgresql://usr_mindzed_core:••••••••@postgres-databases-sharedpostgres-kooq42:5432/db_mindzed_core_prod",
       ssh_tunnel: "postgresql://usr_mindzed_core:••••••••@localhost:5433/db_mindzed_core_prod",
       external_vercel: "postgresql://usr_mindzed_core:••••••••@vps-host:6432/db_mindzed_core_prod?sslmode=disable",
     },
@@ -101,7 +101,7 @@ let mockDatabases: DatabaseSummary[] = [
     project: "client_crm",
     active_connections: 1,
     connections: {
-      dokploy_internal: "postgresql://usr_client_crm:••••••••@postgres:5432/db_client_crm_staging",
+      dokploy_internal: "postgresql://usr_client_crm:••••••••@postgres-databases-sharedpostgres-kooq42:5432/db_client_crm_staging",
       ssh_tunnel: "postgresql://usr_client_crm:••••••••@localhost:5433/db_client_crm_staging",
       external_vercel: "postgresql://usr_client_crm:••••••••@vps-host:6432/db_client_crm_staging?sslmode=disable",
     },
@@ -115,7 +115,7 @@ let mockDatabases: DatabaseSummary[] = [
     project: "analytics",
     active_connections: 0,
     connections: {
-      dokploy_internal: "postgresql://usr_analytics:••••••••@postgres:5432/db_analytics_dev",
+      dokploy_internal: "postgresql://usr_analytics:••••••••@postgres-databases-sharedpostgres-kooq42:5432/db_analytics_dev",
       ssh_tunnel: "postgresql://usr_analytics:••••••••@localhost:5433/db_analytics_dev",
       external_vercel: "postgresql://usr_analytics:••••••••@vps-host:6432/db_analytics_dev?sslmode=disable",
     },
@@ -393,7 +393,7 @@ export async function fetchDatabases(): Promise<{
   return {
     databases: [...mockDatabases],
     clusterInfo: {
-      internal_host: "postgres",
+      internal_host: "postgres-databases-sharedpostgres-kooq42",
       external_host: "vps-host",
       port: "5432",
       pgbouncer_port: "6432",
@@ -443,7 +443,7 @@ export async function createDatabaseApi(
     username: userName,
     password,
     connections: {
-      dokploy_internal: `postgresql://${userName}:${password}@postgres:5432/${dbName}`,
+      dokploy_internal: `postgresql://${userName}:${password}@postgres-databases-sharedpostgres-kooq42:5432/${dbName}`,
       ssh_tunnel: `postgresql://${userName}:${password}@localhost:5433/${dbName}`,
       external_vercel: `postgresql://${userName}:${password}@vps-host:6432/${dbName}?sslmode=disable`,
     },
@@ -525,7 +525,7 @@ export async function resetDatabasePasswordApi(
     username: `usr_${name.replace(/^db_/, "").replace(/_[^_]+$/, "")}`,
     password: newPassword,
     connections: {
-      dokploy_internal: `postgresql://mock:${newPassword}@postgres:5432/${name}`,
+      dokploy_internal: `postgresql://mock:${newPassword}@postgres-databases-sharedpostgres-kooq42:5432/${name}`,
       ssh_tunnel: `postgresql://mock:${newPassword}@localhost:5433/${name}`,
       external_vercel: `postgresql://mock:${newPassword}@vps-host:6432/${name}?sslmode=disable`,
     },

@@ -92,10 +92,10 @@ GIN_MODE=release
 AGENT_SECRET=your_32_character_secret_key_here
 
 # Internal PostgreSQL connection
-DATABASE_URL=postgres://postgres:YOUR_POSTGRES_PASSWORD@postgres:5432/postgres?sslmode=disable
+DATABASE_URL=postgres://postgres:YOUR_POSTGRES_PASSWORD@postgres-databases-sharedpostgres-kooq42:5432/postgres?sslmode=disable
 
 # Hostnames provided to the Web Hub when creating connection strings
-PG_INTERNAL_HOST=postgres
+PG_INTERNAL_HOST=postgres-databases-sharedpostgres-kooq42
 PG_EXTERNAL_HOST=your_vps_ip_or_custom_domain
 SSH_LOCAL_PORT=5433
 
@@ -145,8 +145,8 @@ If you run Docker without Dokploy:
          - PORT=8080
          - GIN_MODE=release
          - AGENT_SECRET=your_32_character_secret_key_here
-         - DATABASE_URL=postgres://postgres:your_password@postgres:5432/postgres?sslmode=disable
-         - PG_INTERNAL_HOST=postgres
+         - DATABASE_URL=postgres://postgres:your_password@postgres-databases-sharedpostgres-kooq42:5432/postgres?sslmode=disable
+         - PG_INTERNAL_HOST=postgres-databases-sharedpostgres-kooq42
          - PG_EXTERNAL_HOST=your_vps_ip
          - SSH_LOCAL_PORT=5433
          - WHITELIST_FILE=/app/data/whitelist.json

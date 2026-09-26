@@ -372,10 +372,11 @@ export default function DatabaseStudioPage() {
       if (currentDb) {
         const cachedCreds = getSavedDatabaseCredentials(currentDb.name);
         const externalHost = res.clusterInfo?.external_host || window.location.hostname;
-        const pgbouncerPort = res.clusterInfo?.pgbouncer_port || "6432";
         const passwordToDisplay = cachedCreds?.password || "••••••••";
-
+        const pgbouncerPort = res.clusterInfo?.pgbouncer_port || "6432";
         const correctedVercelUrl = `postgresql://${currentDb.owner}:${passwordToDisplay}@${externalHost}:${pgbouncerPort}/${currentDb.name}?sslmode=disable`;
+        const internalHost = (res.clusterInfo?.internal_host && res.clusterInfo.internal_host !== "postgres") ? res.clusterInfo.internal_host : "postgres-databases-sharedpostgres-kooq42";
+        const correctedDokployUrl = (currentDb.connections?.dokploy_internal || "").replace(/@postgres:5432\//, `@${internalHost}:5432/`);
 
         setConnectionModalData({
           success: true,
@@ -383,7 +384,7 @@ export default function DatabaseStudioPage() {
           username: currentDb.owner,
           password: passwordToDisplay,
           connections: {
-            dokploy_internal: currentDb.connections?.dokploy_internal || "",
+            dokploy_internal: correctedDokployUrl,
             ssh_tunnel: currentDb.connections?.ssh_tunnel || "",
             external_vercel: correctedVercelUrl,
           },

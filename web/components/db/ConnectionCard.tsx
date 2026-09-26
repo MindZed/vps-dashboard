@@ -44,6 +44,7 @@ export default function ConnectionCard({ data, onClose }: ConnectionCardProps) {
         ...data,
         connections: {
           ...data.connections,
+          dokploy_internal: (data.connections?.dokploy_internal || "").replace(/@postgres:5432\//, "@postgres-databases-sharedpostgres-kooq42:5432/"),
           external_vercel: (data.connections?.external_vercel || "").replace(/:5432\//, ":6432/"),
         },
       });
@@ -79,6 +80,7 @@ export default function ConnectionCard({ data, onClose }: ConnectionCardProps) {
         ...res.data,
         connections: {
           ...res.data.connections,
+          dokploy_internal: (res.data.connections?.dokploy_internal || "").replace(/@postgres:5432\//, "@postgres-databases-sharedpostgres-kooq42:5432/"),
           external_vercel: res.data.connections.external_vercel.replace(/:5432\//, ":6432/"),
         },
       };
