@@ -1032,3 +1032,286 @@ export async function executeSqlQuery(
     message: "Executed in mock mode",
   };
 }
+
+// -------------------------------------------------------------
+// Database Backup & Disaster Recovery Client API
+// -------------------------------------------------------------
+
+export interface BackupItem {
+  filename: string;
+  label: string;
+  database: string;
+  type: "manual" | "auto";
+  size_bytes: number;
+  created_at: string;
+}
+
+export interface BackupScheduleConfig {
+  database: string;
+  enabled: boolean;
+  cron_expr: string;
+  sliding_window: number; // 1 to 5
+  last_run?: string;
+  next_run?: string;
+  last_status?: "success" | "failed";
+  last_error?: string;
+}
+
+export interface ParsedBackupName {
+  rawFilename: string;
+  label: string;
+  database: string;
+  type: "manual" | "auto";
+  createdAt: Date;
+  displayDate: string;
+  displayTime: string;
+  relativeTime: string;
+}
+
+// Parse structured filename: <LABEL>__<DATABASE>__<TYPE>__<YYYYMMDD_HHMMSS>.dump
+export function parseBackupFilename(filename: string, rawCreatedAt?: string): ParsedBackupName {
+  const cleanBase = filename.replace(/\.dump$/, "").replace(/\.sql\.gz$/, "");
+  const parts = cleanBase.split("__");
+
+  let label = filename;
+  let database = "database";
+  let type: "manual" | "auto" = "manual";
+  let dateObj = new Date();
+
+  if (parts.length >= 4) {
+    label = parts[0];
+    database = parts[1];
+    type = parts[2] === "auto" ? "auto" : "manual";
+    const timeStr = parts[3]; // e.g. "20261009_011500"
+    if (timeStr.length >= 15 && timeStr.includes("_")) {
+      const year = parseInt(timeStr.substring(0, 4), 10);
+      const month = parseInt(timeStr.substring(4, 6), 10) - 1;
+      const day = parseInt(timeStr.substring(6, 8), 10);
+      const hour = parseInt(timeStr.substring(9, 11), 10);
+      const min = parseInt(timeStr.substring(11, 13), 10);
+      const sec = parseInt(timeStr.substring(13, 15), 10);
+      dateObj = new Date(Date.UTC(year, month, day, hour, min, sec));
+    }
+  } else if (rawCreatedAt) {
+    dateObj = new Date(rawCreatedAt);
+  }
+
+  const displayDate = dateObj.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+  const displayTime = dateObj.toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  const diffSec = Math.max(0, Math.floor((Date.now() - dateObj.getTime()) / 1000));
+  let relativeTime = "just now";
+  if (diffSec >= 86400) {
+    const days = Math.floor(diffSec / 86400);
+    relativeTime = `${days}d ago`;
+  } else if (diffSec >= 3600) {
+    const hours = Math.floor(diffSec / 3600);
+    relativeTime = `${hours}h ago`;
+  } else if (diffSec >= 60) {
+    const mins = Math.floor(diffSec / 60);
+    relativeTime = `${mins}m ago`;
+  }
+
+  return {
+    rawFilename: filename,
+    label,
+    database,
+    type,
+    createdAt: dateObj,
+    displayDate,
+    displayTime,
+    relativeTime,
+  };
+}
+
+let mockBackups: BackupItem[] = [
+  {
+    filename: "pre-migration-v1__db_school_erp_dev__manual__20261008_180000.dump",
+    label: "pre-migration-v1",
+    database: "db_school_erp_dev",
+    type: "manual",
+    size_bytes: 4892011,
+    created_at: new Date(Date.now() - 3600000 * 6).toISOString(),
+  },
+  {
+    filename: "auto-scheduled__db_school_erp_dev__auto__20261008_020000.dump",
+    label: "auto-scheduled",
+    database: "db_school_erp_dev",
+    type: "auto",
+    size_bytes: 4721990,
+    created_at: new Date(Date.now() - 3600000 * 22).toISOString(),
+  },
+];
+
+let mockSchedules: Record<string, BackupScheduleConfig> = {
+  db_school_erp_dev: {
+    database: "db_school_erp_dev",
+    enabled: true,
+    cron_expr: "0 2 * * *",
+    sliding_window: 5,
+    last_run: new Date(Date.now() - 3600000 * 22).toISOString(),
+    next_run: new Date(Date.now() + 3600000 * 2).toISOString(),
+    last_status: "success",
+  },
+};
+
+export async function fetchBackups(database?: string): Promise<{ success: boolean; backups: BackupItem[] }> {
+  const config = getAgentConfig();
+  if (!config.forceDemo) {
+    try {
+      const url = database ? `backups?db=${encodeURIComponent(database)}` : "backups";
+      const res = await fetch(getApiEndpoint(url), {
+        headers: getHeaders(),
+        cache: "no-store",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return { success: true, backups: data.backups || [] };
+      }
+    } catch {
+      // Fallback to mock
+    }
+  }
+
+  const filtered = database ? mockBackups.filter((b) => b.database === database) : mockBackups;
+  return { success: true, backups: filtered };
+}
+
+export async function createBackup(database: string, name: string): Promise<{ success: boolean; backup?: BackupItem; message: string; error?: string }> {
+  const config = getAgentConfig();
+  if (!config.forceDemo) {
+    try {
+      const res = await fetch(getApiEndpoint("backups/create"), {
+        method: "POST",
+        headers: getHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ database, name }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        return { success: true, backup: data.backup, message: data.message };
+      }
+      return { success: false, message: data.error || data.message || "Backup failed", error: data.error };
+    } catch (e: unknown) {
+      return { success: false, message: e instanceof Error ? e.message : "Network error" };
+    }
+  }
+
+  // Mock creation
+  const cleanLabel = name.toLowerCase().replace(/[^a-z0-9_\-]+/g, "-");
+  const now = new Date();
+  const timeStr = now.toISOString().replace(/[-:T]/g, "").slice(0, 15);
+  const newItem: BackupItem = {
+    filename: `${cleanLabel}__${database}__manual__${timeStr}.dump`,
+    label: cleanLabel,
+    database,
+    type: "manual",
+    size_bytes: 3500000 + Math.floor(Math.random() * 2000000),
+    created_at: now.toISOString(),
+  };
+  mockBackups.unshift(newItem);
+  return { success: true, backup: newItem, message: `Backup '${cleanLabel}' created successfully` };
+}
+
+export async function restoreBackup(database: string, filename: string): Promise<{ success: boolean; message: string; safety_backup?: BackupItem; error?: string }> {
+  const config = getAgentConfig();
+  if (!config.forceDemo) {
+    try {
+      const res = await fetch(getApiEndpoint("backups/restore"), {
+        method: "POST",
+        headers: getHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ database, filename }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        return { success: true, message: data.message, safety_backup: data.safety_backup };
+      }
+      return { success: false, message: data.error || data.message || "Restore failed", error: data.error };
+    } catch (e: unknown) {
+      return { success: false, message: e instanceof Error ? e.message : "Network error" };
+    }
+  }
+
+  return { success: true, message: `Database '${database}' restored successfully in mock mode.` };
+}
+
+export async function deleteBackup(filename: string): Promise<{ success: boolean; message: string }> {
+  const config = getAgentConfig();
+  if (!config.forceDemo) {
+    try {
+      const res = await fetch(getApiEndpoint(`backups/${encodeURIComponent(filename)}`), {
+        method: "DELETE",
+        headers: getHeaders(),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        return { success: true, message: data.message };
+      }
+    } catch {
+      // Fallback
+    }
+  }
+
+  mockBackups = mockBackups.filter((b) => b.filename !== filename);
+  return { success: true, message: "Backup snapshot deleted" };
+}
+
+export async function getBackupSchedule(database: string): Promise<{ success: boolean; schedule: BackupScheduleConfig }> {
+  const config = getAgentConfig();
+  if (!config.forceDemo) {
+    try {
+      const res = await fetch(getApiEndpoint(`backups/schedule?db=${encodeURIComponent(database)}`), {
+        headers: getHeaders(),
+        cache: "no-store",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return { success: true, schedule: data.schedule };
+      }
+    } catch {
+      // Fallback
+    }
+  }
+
+  const sched = mockSchedules[database] || {
+    database,
+    enabled: false,
+    cron_expr: "0 2 * * *",
+    sliding_window: 5,
+  };
+  return { success: true, schedule: sched };
+}
+
+export async function saveBackupSchedule(sched: BackupScheduleConfig): Promise<{ success: boolean; schedule?: BackupScheduleConfig; message: string; error?: string }> {
+  const config = getAgentConfig();
+  if (!config.forceDemo) {
+    try {
+      const res = await fetch(getApiEndpoint("backups/schedule"), {
+        method: "POST",
+        headers: getHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify(sched),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        return { success: true, schedule: data.schedule, message: data.message };
+      }
+      return { success: false, message: data.error || data.message || "Failed to save schedule", error: data.error };
+    } catch (e: unknown) {
+      return { success: false, message: e instanceof Error ? e.message : "Network error" };
+    }
+  }
+
+  mockSchedules[sched.database] = sched;
+  return { success: true, schedule: sched, message: "Backup schedule updated successfully" };
+}
+
+export function getBackupDownloadUrl(filename: string): string {
+  return `/api/proxy/backups/${encodeURIComponent(filename)}/download`;
+}
+

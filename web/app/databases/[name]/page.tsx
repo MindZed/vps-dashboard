@@ -33,7 +33,9 @@ import {
   Copy,
   Eye,
   Pencil,
+  Archive,
 } from "lucide-react";
+import DatabaseBackupsView from "@/components/db/DatabaseBackupsView";
 import {
   ExplorerTable,
   ExplorerColumn,
@@ -61,8 +63,8 @@ export default function DatabaseStudioPage() {
   const router = useRouter();
   const dbName = typeof params.name === "string" ? decodeURIComponent(params.name) : "";
 
-  // Mode: "explorer" | "sql"
-  const [activeTab, setActiveTab] = useState<"explorer" | "sql">("explorer");
+  // Mode: "explorer" | "sql" | "backups"
+  const [activeTab, setActiveTab] = useState<"explorer" | "sql" | "backups">("explorer");
 
   // Database & Table state
   const [tables, setTables] = useState<ExplorerTable[]>([]);
@@ -453,7 +455,7 @@ export default function DatabaseStudioPage() {
             </div>
           </div>
 
-          {/* Center Tabs: Table Editor vs SQL Console */}
+          {/* Center Tabs: Table Editor vs SQL Console vs Backups */}
           <div className="flex items-center bg-zinc-900/90 p-1 rounded-xl border border-zinc-800">
             <button
               onClick={() => setActiveTab("explorer")}
@@ -477,6 +479,17 @@ export default function DatabaseStudioPage() {
               <Terminal className="w-3.5 h-3.5 text-indigo-400" />
               <span>SQL Console</span>
             </button>
+            <button
+              onClick={() => setActiveTab("backups")}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                activeTab === "backups"
+                  ? "bg-zinc-800 text-purple-300 shadow-sm border border-zinc-700"
+                  : "text-zinc-400 hover:text-white"
+              }`}
+            >
+              <Archive className="w-3.5 h-3.5 text-purple-400" />
+              <span>Backups</span>
+            </button>
           </div>
 
           {/* Right Tools */}
@@ -493,101 +506,110 @@ export default function DatabaseStudioPage() {
 
         {/* Main Studio Body: Sidebar + Workspace */}
         <div className="flex-1 flex overflow-hidden">
-          {/* Left Sidebar (Tables & Schemas) */}
-          <aside className="w-64 border-r border-zinc-800 bg-[#0e0e11] flex flex-col shrink-0">
-            {/* Sidebar Top: Action & Search */}
-            <div className="p-3 border-b border-zinc-800 space-y-2.5">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider font-mono">
-                  Tables ({tables.length})
-                </span>
-                <button
-                  onClick={() => setIsNewTableModalOpen(true)}
-                  className="flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-medium shadow-sm transition-colors"
-                >
-                  <Plus className="w-3 h-3" />
-                  <span>New Table</span>
-                </button>
-              </div>
-              <div className="relative">
-                <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-2.5" />
-                <input
-                  type="text"
-                  placeholder="Filter tables..."
-                  value={tableSearch}
-                  onChange={(e) => setTableSearch(e.target.value)}
-                  className="w-full pl-8 pr-2.5 py-1.5 bg-zinc-950/80 border border-zinc-800 rounded-lg text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-emerald-500 font-mono"
-                />
-              </div>
-            </div>
-
-            {/* Tables List */}
-            <div className="flex-1 overflow-y-auto p-2 space-y-1">
-              {tablesError && (
-                <div className="p-3 mb-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs space-y-1.5">
-                  <div className="flex items-center gap-1.5 font-semibold text-amber-400">
-                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                    <span>Redeploy Required</span>
-                  </div>
-                  <p className="text-[11px] text-amber-200/80 leading-relaxed font-sans">
-                    The Go Agent hasn&apos;t loaded the explorer endpoints yet. Click <strong>Redeploy</strong> on <code>mindzed-agent</code> in Dokploy.
-                  </p>
-                </div>
-              )}
-
-              {loadingTables ? (
-                <div className="flex items-center justify-center p-8 text-xs text-zinc-500 gap-2">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />
-                  <span>Reading catalogs...</span>
-                </div>
-              ) : filteredTables.length === 0 ? (
-                <div className="p-6 text-center text-xs text-zinc-500">
-                  <Table className="w-6 h-6 mx-auto mb-2 text-zinc-600" />
-                  <p>No tables found.</p>
+          {/* Left Sidebar (Tables & Schemas) - visible in explorer and sql tabs */}
+          {activeTab !== "backups" && (
+            <aside className="w-64 border-r border-zinc-800 bg-[#0e0e11] flex flex-col shrink-0">
+              {/* Sidebar Top: Action & Search */}
+              <div className="p-3 border-b border-zinc-800 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider font-mono">
+                    Tables ({tables.length})
+                  </span>
                   <button
                     onClick={() => setIsNewTableModalOpen(true)}
-                    className="mt-2 text-emerald-400 hover:underline"
+                    className="flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-medium shadow-sm transition-colors"
                   >
-                    Create one now
+                    <Plus className="w-3 h-3" />
+                    <span>New Table</span>
                   </button>
                 </div>
-              ) : (
-                filteredTables.map((tbl) => {
-                  const isSelected = selectedTable === tbl.name;
-                  return (
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-2.5" />
+                  <input
+                    type="text"
+                    placeholder="Filter tables..."
+                    value={tableSearch}
+                    onChange={(e) => setTableSearch(e.target.value)}
+                    className="w-full pl-8 pr-2.5 py-1.5 bg-zinc-950/80 border border-zinc-800 rounded-lg text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-emerald-500 font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* Tables List */}
+              <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                {tablesError && (
+                  <div className="p-3 mb-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs space-y-1.5">
+                    <div className="flex items-center gap-1.5 font-semibold text-amber-400">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      <span>Redeploy Required</span>
+                    </div>
+                    <p className="text-[11px] text-amber-200/80 leading-relaxed font-sans">
+                      The Go Agent hasn&apos;t loaded the explorer endpoints yet. Click <strong>Redeploy</strong> on <code>mindzed-agent</code> in Dokploy.
+                    </p>
+                  </div>
+                )}
+
+                {loadingTables ? (
+                  <div className="flex items-center justify-center p-8 text-xs text-zinc-500 gap-2">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />
+                    <span>Reading catalogs...</span>
+                  </div>
+                ) : filteredTables.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-zinc-500">
+                    <Table className="w-6 h-6 mx-auto mb-2 text-zinc-600" />
+                    <p>No tables found.</p>
                     <button
-                      key={tbl.name}
-                      onClick={() => {
-                        setSelectedTable(tbl.name);
-                        if (activeTab !== "explorer") setActiveTab("explorer");
-                      }}
-                      className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-mono transition-all text-left group ${
-                        isSelected
-                          ? "bg-emerald-500/15 text-emerald-300 font-medium border border-emerald-500/30"
-                          : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-100"
-                      }`}
+                      onClick={() => setIsNewTableModalOpen(true)}
+                      className="mt-2 text-emerald-400 hover:underline"
                     >
-                      <div className="flex items-center gap-2 truncate">
-                        <Table
-                          className={`w-3.5 h-3.5 shrink-0 ${
-                            isSelected ? "text-emerald-400" : "text-zinc-500 group-hover:text-zinc-300"
-                          }`}
-                        />
-                        <span className="truncate">{tbl.name}</span>
-                      </div>
-                      <span className="text-[10px] text-zinc-500 group-hover:text-zinc-400 shrink-0">
-                        {tbl.estimated_rows}
-                      </span>
+                      Create one now
                     </button>
-                  );
-                })
-              )}
-            </div>
-          </aside>
+                  </div>
+                ) : (
+                  filteredTables.map((tbl) => {
+                    const isSelected = selectedTable === tbl.name;
+                    return (
+                      <button
+                        key={tbl.name}
+                        onClick={() => {
+                          setSelectedTable(tbl.name);
+                          if (activeTab !== "explorer") setActiveTab("explorer");
+                        }}
+                        className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-mono transition-all text-left group ${
+                          isSelected
+                            ? "bg-emerald-500/15 text-emerald-300 font-medium border border-emerald-500/30"
+                            : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-100"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 truncate">
+                          <Table
+                            className={`w-3.5 h-3.5 shrink-0 ${
+                              isSelected ? "text-emerald-400" : "text-zinc-500 group-hover:text-zinc-300"
+                            }`}
+                          />
+                          <span className="truncate">{tbl.name}</span>
+                        </div>
+                        <span className="text-[10px] text-zinc-500 group-hover:text-zinc-400 shrink-0">
+                          {tbl.estimated_rows}
+                        </span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </aside>
+          )}
 
         {/* Right Canvas: Workspace */}
         <main className="flex-1 flex flex-col overflow-hidden bg-[#09090b]">
-          {activeTab === "explorer" ? (
+          {activeTab === "backups" ? (
+            /* TAB 3: BACKUPS & DISASTER RECOVERY */
+            <div className="flex-1 overflow-y-auto p-6 bg-[#09090b]">
+              <div className="max-w-6xl mx-auto">
+                <DatabaseBackupsView dbName={dbName} />
+              </div>
+            </div>
+          ) : activeTab === "explorer" ? (
             /* TAB 1: TABLE EXPLORER */
             <div className="flex-1 flex flex-col overflow-hidden">
               {/* Table Toolbar */}

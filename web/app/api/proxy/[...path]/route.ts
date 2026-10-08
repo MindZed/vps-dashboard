@@ -39,9 +39,13 @@ async function proxyRequest(req: NextRequest, { params }: { params: Promise<{ pa
     }
   }
 
+  const isBackupOp = targetPath.startsWith("backups");
+  const isDownload = targetPath.endsWith("/download");
+  const timeoutMs = isBackupOp ? 240000 : 15000; // 4 minutes for backup/restore dumps
+
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     const upstreamRes = await fetch(upstreamUrl, {
       method: req.method,
@@ -51,6 +55,21 @@ async function proxyRequest(req: NextRequest, { params }: { params: Promise<{ pa
       cache: "no-store",
     });
     clearTimeout(timeoutId);
+
+    // If downloading a backup dump, stream as binary arrayBuffer
+    if (isDownload) {
+      const buffer = await upstreamRes.arrayBuffer();
+      const responseHeaders = new Headers();
+      responseHeaders.set("Content-Type", upstreamRes.headers.get("Content-Type") || "application/octet-stream");
+      const contentDisp = upstreamRes.headers.get("Content-Disposition");
+      if (contentDisp) {
+        responseHeaders.set("Content-Disposition", contentDisp);
+      }
+      return new NextResponse(buffer, {
+        status: upstreamRes.status,
+        headers: responseHeaders,
+      });
+    }
 
     const data = await upstreamRes.text();
     const responseHeaders = new Headers();

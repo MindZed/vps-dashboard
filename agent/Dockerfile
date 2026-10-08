@@ -27,20 +27,22 @@ RUN CGO_ENABLED=0 go build \
 # -------------------------------------------------------------
 FROM alpine:3.20
 
-RUN apk add --no-cache ca-certificates tzdata wget
+RUN apk add --no-cache ca-certificates tzdata wget postgresql-client docker-cli
 
 WORKDIR /app
 
-# Create data directory for whitelist persistence
-RUN mkdir -p /app/data
+# Create data and backup directories for persistence
+RUN mkdir -p /app/data /app/data/backups
 
 # Copy compiled binary from builder
 COPY --from=builder /bin/mindzed-agent /app/mindzed-agent
 RUN chmod +x /app/mindzed-agent
 
 ENV WHITELIST_FILE=/app/data/whitelist.json
+ENV BACKUP_DIR=/app/data/backups
+ENV BACKUP_CONFIG_FILE=/app/data/backup_schedules.json
 
-# Declare persistent volume so container updates never destroy whitelist.json
+# Declare persistent volume so container updates never destroy whitelist or backups
 VOLUME ["/app/data"]
 
 EXPOSE 8080

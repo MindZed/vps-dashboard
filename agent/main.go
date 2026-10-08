@@ -159,6 +159,7 @@ func main() {
 
 	dbManager := handler.NewDBManager(pool)
 	explorerManager := handler.NewExplorerManager(pgConnString)
+	backupManager := handler.NewBackupManager(pool, pgConnString)
 
 	// 4. Gin Router Setup
 	r := gin.New()
@@ -254,6 +255,15 @@ func main() {
 		v1.POST("/auth/whitelist", dbManager.AddWhitelistUser)
 		v1.DELETE("/auth/whitelist/:username", dbManager.DeleteWhitelistUser)
 		v1.GET("/auth/verify/:username", dbManager.VerifyUser)
+
+		// Database Backup & Disaster Recovery
+		v1.GET("/backups", backupManager.ListBackups)
+		v1.POST("/backups/create", backupManager.CreateBackup)
+		v1.POST("/backups/restore", backupManager.RestoreBackup)
+		v1.GET("/backups/:filename/download", backupManager.DownloadBackup)
+		v1.DELETE("/backups/:filename", backupManager.DeleteBackup)
+		v1.GET("/backups/schedule", backupManager.GetSchedule)
+		v1.POST("/backups/schedule", backupManager.SaveSchedule)
 	}
 
 	// 8. Graceful Server Startup & Shutdown
