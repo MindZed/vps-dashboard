@@ -624,9 +624,17 @@ func (bm *BackupManager) GetSchedule(c *gin.Context) {
 
 // SaveSchedule handles POST /api/v1/backups/schedule
 func (bm *BackupManager) SaveSchedule(c *gin.Context) {
-	var req DatabaseSchedule
+	var req struct {
+		Database      string `json:"database"`
+		Enabled       bool   `json:"enabled"`
+		CronExpr      string `json:"cron_expr"`
+		SlidingWindow int    `json:"sliding_window"`
+	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid schedule payload"})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid schedule payload",
+			"message": err.Error(),
+		})
 		return
 	}
 
@@ -668,7 +676,13 @@ func (bm *BackupManager) SaveSchedule(c *gin.Context) {
 	}
 
 	// Update schedule entry
-	bm.schedules[req.Database] = &req
+	sched := &DatabaseSchedule{
+		Database:      req.Database,
+		Enabled:       req.Enabled,
+		CronExpr:      req.CronExpr,
+		SlidingWindow: req.SlidingWindow,
+	}
+	bm.schedules[req.Database] = sched
 
 	// If enabled, register new cron entry
 	if req.Enabled {
@@ -679,10 +693,10 @@ func (bm *BackupManager) SaveSchedule(c *gin.Context) {
 		bm.cronEntries[db] = entryID
 
 		next := schedule.Next(time.Now())
-		req.NextRun = &next
+		sched.NextRun = &next
 		log.Printf("[INFO] [CRON] Registered auto-backup for %s with expr '%s'. Next run: %s", db, req.CronExpr, next.Format(time.RFC3339))
 	} else {
-		req.NextRun = nil
+		sched.NextRun = nil
 		log.Printf("[INFO] [CRON] Disabled auto-backup for %s", req.Database)
 	}
 
@@ -690,7 +704,7 @@ func (bm *BackupManager) SaveSchedule(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"success":  true,
-		"schedule": req,
+		"schedule": sched,
 		"message":  "Backup schedule updated successfully",
 	})
 }
