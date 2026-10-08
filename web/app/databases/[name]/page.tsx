@@ -483,11 +483,11 @@ export default function DatabaseStudioPage() {
               onClick={() => setActiveTab("backups")}
               className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
                 activeTab === "backups"
-                  ? "bg-zinc-800 text-purple-300 shadow-sm border border-zinc-700"
+                  ? "bg-zinc-800 text-zinc-100 shadow-sm border border-zinc-700"
                   : "text-zinc-400 hover:text-white"
               }`}
             >
-              <Archive className="w-3.5 h-3.5 text-purple-400" />
+              <Archive className="w-3.5 h-3.5 text-zinc-300" />
               <span>Backups</span>
             </button>
           </div>

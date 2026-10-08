@@ -71,11 +71,22 @@ async function proxyRequest(req: NextRequest, { params }: { params: Promise<{ pa
       });
     }
 
-    const data = await upstreamRes.text();
-    const responseHeaders = new Headers();
-    responseHeaders.set("Content-Type", upstreamRes.headers.get("Content-Type") || "application/json");
+    const textData = await upstreamRes.text();
+    let jsonBody: string;
+    try {
+      JSON.parse(textData);
+      jsonBody = textData;
+    } catch {
+      jsonBody = JSON.stringify({
+        error: upstreamRes.ok ? "OK" : `Upstream returned ${upstreamRes.status}`,
+        message: textData || `Upstream returned status ${upstreamRes.status}`,
+      });
+    }
 
-    return new NextResponse(data, {
+    const responseHeaders = new Headers();
+    responseHeaders.set("Content-Type", "application/json");
+
+    return new NextResponse(jsonBody, {
       status: upstreamRes.status,
       headers: responseHeaders,
     });

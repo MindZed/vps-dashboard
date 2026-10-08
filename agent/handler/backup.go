@@ -422,7 +422,7 @@ func (bm *BackupManager) ListBackups(c *gin.Context) {
 		return
 	}
 
-	var results []BackupItem
+	results := make([]BackupItem, 0)
 	for _, f := range files {
 		if f.IsDir() {
 			continue
@@ -610,7 +610,7 @@ func (bm *BackupManager) GetSchedule(c *gin.Context) {
 		return
 	}
 
-	var all []*DatabaseSchedule
+	all := make([]*DatabaseSchedule, 0)
 	for _, s := range bm.schedules {
 		if entryID, ok := bm.cronEntries[s.Database]; ok {
 			entry := bm.cronRunner.Entry(entryID)

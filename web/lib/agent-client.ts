@@ -1172,7 +1172,7 @@ export async function fetchBackups(database?: string): Promise<{ success: boolea
         cache: "no-store",
       });
       if (res.ok) {
-        const data = await res.json();
+        const data = await res.json().catch(() => ({ backups: [] }));
         return { success: true, backups: data.backups || [] };
       }
     } catch {
@@ -1193,7 +1193,7 @@ export async function createBackup(database: string, name: string): Promise<{ su
         headers: getHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ database, name }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
         return { success: true, backup: data.backup, message: data.message };
       }
@@ -1228,7 +1228,7 @@ export async function restoreBackup(database: string, filename: string): Promise
         headers: getHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ database, filename }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
         return { success: true, message: data.message, safety_backup: data.safety_backup };
       }
@@ -1249,7 +1249,7 @@ export async function deleteBackup(filename: string): Promise<{ success: boolean
         method: "DELETE",
         headers: getHeaders(),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
         return { success: true, message: data.message };
       }
@@ -1271,8 +1271,10 @@ export async function getBackupSchedule(database: string): Promise<{ success: bo
         cache: "no-store",
       });
       if (res.ok) {
-        const data = await res.json();
-        return { success: true, schedule: data.schedule };
+        const data = await res.json().catch(() => ({}));
+        if (data.schedule) {
+          return { success: true, schedule: data.schedule };
+        }
       }
     } catch {
       // Fallback
@@ -1297,7 +1299,7 @@ export async function saveBackupSchedule(sched: BackupScheduleConfig): Promise<{
         headers: getHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify(sched),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
         return { success: true, schedule: data.schedule, message: data.message };
       }

@@ -18,7 +18,6 @@ import {
   Sparkles,
   Info,
   CheckCircle2,
-  XCircle,
   X,
   FileCode2,
 } from "lucide-react";
@@ -54,7 +53,7 @@ export default function DatabaseBackupsView({ dbName }: DatabaseBackupsViewProps
     cron_expr: "0 2 * * *",
     sliding_window: 5,
   });
-  const [loadingSchedule, setLoadingSchedule] = useState(true);
+  const [, setLoadingSchedule] = useState(true);
   const [savingSchedule, setSavingSchedule] = useState(false);
   const [scheduleSuccess, setScheduleSuccess] = useState(false);
 
@@ -86,7 +85,7 @@ export default function DatabaseBackupsView({ dbName }: DatabaseBackupsViewProps
         fetchBackups(dbName),
         getBackupSchedule(dbName),
       ]);
-      if (backupsRes.success) {
+      if (backupsRes.success && backupsRes.backups) {
         setBackups(backupsRes.backups);
       }
       if (schedRes.success && schedRes.schedule) {
@@ -242,8 +241,8 @@ export default function DatabaseBackupsView({ dbName }: DatabaseBackupsViewProps
             exit={{ opacity: 0, y: -20 }}
             className={`fixed top-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl border ${
               toast.type === "success"
-                ? "bg-zinc-900 border-emerald-500/40 text-emerald-300"
-                : "bg-zinc-900 border-rose-500/40 text-rose-300"
+                ? "bg-zinc-900 border-emerald-500/30 text-emerald-300"
+                : "bg-zinc-900 border-rose-500/30 text-rose-300"
             }`}
           >
             {toast.type === "success" ? (
@@ -260,7 +259,7 @@ export default function DatabaseBackupsView({ dbName }: DatabaseBackupsViewProps
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-5 rounded-2xl bg-zinc-900/60 border border-zinc-800/80 backdrop-blur-md">
         <div className="space-y-1">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400">
+            <div className="p-2 rounded-xl bg-zinc-800 border border-zinc-700/60 text-zinc-200">
               <Archive className="w-5 h-5" />
             </div>
             <h2 className="text-lg font-semibold text-zinc-100">
@@ -276,19 +275,21 @@ export default function DatabaseBackupsView({ dbName }: DatabaseBackupsViewProps
           <button
             onClick={loadData}
             disabled={loading}
-            className="p-2.5 rounded-xl bg-zinc-800/70 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-zinc-700/50 transition-colors"
+            className="p-2.5 rounded-xl bg-zinc-800/80 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 border border-zinc-700/60 transition-colors"
             title="Refresh backups list"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </button>
+          
+          {/* Proprietary White-Grey Gradient CTA */}
           <button
             onClick={() => {
               setCustomBackupName("");
               setIsCreateModalOpen(true);
             }}
-            className="flex-1 md:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-medium text-sm shadow-lg shadow-purple-900/20 border border-purple-400/20 transition-all hover:scale-[1.02] active:scale-[0.98]"
+            className="flex-1 md:flex-initial flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-b from-white via-zinc-100 to-zinc-300 hover:from-white hover:to-zinc-200 text-zinc-950 font-semibold text-sm shadow-md shadow-black/30 border border-white/50 transition-all hover:scale-[1.02] active:scale-[0.98]"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-4 h-4 text-zinc-950 stroke-[2.5]" />
             <span>Take Backup Now</span>
           </button>
         </div>
@@ -298,7 +299,7 @@ export default function DatabaseBackupsView({ dbName }: DatabaseBackupsViewProps
       <div className="p-5 rounded-2xl bg-zinc-900/40 border border-zinc-800/80 space-y-5">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 pb-4 border-b border-zinc-800/60">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
+            <div className="p-2 rounded-xl bg-zinc-800 border border-zinc-700/60 text-zinc-300">
               <Clock className="w-5 h-5" />
             </div>
             <div>
@@ -306,10 +307,11 @@ export default function DatabaseBackupsView({ dbName }: DatabaseBackupsViewProps
                 <h3 className="text-sm font-semibold text-zinc-200">
                   Automated Backup Scheduler
                 </h3>
+                {/* Soft palette indicating badge */}
                 <span
                   className={`text-[10px] px-2 py-0.5 rounded-full font-mono uppercase tracking-wider border ${
                     schedule.enabled
-                      ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                      ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-400"
                       : "bg-zinc-800 border-zinc-700 text-zinc-400"
                   }`}
                 >
@@ -330,7 +332,7 @@ export default function DatabaseBackupsView({ dbName }: DatabaseBackupsViewProps
               onChange={(e) => setSchedule({ ...schedule, enabled: e.target.checked })}
               className="sr-only peer"
             />
-            <div className="w-11 h-6 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+            <div className="w-11 h-6 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-zinc-900 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gradient-to-r peer-checked:from-emerald-500 peer-checked:to-teal-500"></div>
             <span className="ml-3 text-xs font-medium text-zinc-300">
               {schedule.enabled ? "Enabled" : "Disabled"}
             </span>
@@ -351,7 +353,7 @@ export default function DatabaseBackupsView({ dbName }: DatabaseBackupsViewProps
                 value={schedule.cron_expr}
                 onChange={(e) => setSchedule({ ...schedule, cron_expr: e.target.value })}
                 placeholder="0 2 * * *"
-                className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950/70 border border-zinc-800 focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/30 text-sm font-mono text-zinc-100 placeholder:text-zinc-600 outline-none transition-all"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950/70 border border-zinc-800 focus:border-zinc-500 focus:ring-1 focus:ring-zinc-400/20 text-sm font-mono text-zinc-100 placeholder:text-zinc-600 outline-none transition-all"
               />
             </div>
 
@@ -359,12 +361,12 @@ export default function DatabaseBackupsView({ dbName }: DatabaseBackupsViewProps
             <div
               className={`p-3 rounded-xl border text-xs flex items-start gap-2.5 ${
                 cronExplanation.isValid
-                  ? "bg-purple-500/5 border-purple-500/20 text-purple-200"
+                  ? "bg-zinc-950 border-zinc-800 text-zinc-300"
                   : "bg-rose-500/5 border-rose-500/20 text-rose-300"
               }`}
             >
               {cronExplanation.isValid ? (
-                <Sparkles className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
+                <Sparkles className="w-4 h-4 text-zinc-300 shrink-0 mt-0.5" />
               ) : (
                 <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
               )}
@@ -389,8 +391,8 @@ export default function DatabaseBackupsView({ dbName }: DatabaseBackupsViewProps
                     onClick={() => setSchedule({ ...schedule, cron_expr: preset.value })}
                     className={`px-2.5 py-1 rounded-lg text-xs font-mono transition-all border ${
                       schedule.cron_expr === preset.value
-                        ? "bg-purple-600/20 border-purple-500/40 text-purple-300 font-semibold"
-                        : "bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
+                        ? "bg-gradient-to-b from-white to-zinc-200 text-zinc-950 font-semibold border-white shadow-sm"
+                        : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
                     }`}
                   >
                     {preset.label}
@@ -407,12 +409,12 @@ export default function DatabaseBackupsView({ dbName }: DatabaseBackupsViewProps
                 <Layers className="w-3.5 h-3.5 text-zinc-400" />
                 Sliding Window Retention (Max 5)
               </label>
-              <span className="text-xs font-bold font-mono px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">
+              <span className="text-xs font-bold font-mono px-2 py-0.5 rounded bg-zinc-800 text-zinc-200 border border-zinc-700">
                 {schedule.sliding_window} Backups
               </span>
             </div>
 
-            {/* 1 to 5 Pill Selectors */}
+            {/* 1 to 5 Pill Selectors (Proprietary White-Grey Gradient for active state) */}
             <div className="grid grid-cols-5 gap-1.5">
               {[1, 2, 3, 4, 5].map((num) => (
                 <button
@@ -421,7 +423,7 @@ export default function DatabaseBackupsView({ dbName }: DatabaseBackupsViewProps
                   onClick={() => setSchedule({ ...schedule, sliding_window: num })}
                   className={`py-2 rounded-xl text-center text-xs font-mono font-semibold transition-all border ${
                     schedule.sliding_window === num
-                      ? "bg-purple-600 text-white border-purple-500 shadow-lg shadow-purple-900/30"
+                      ? "bg-gradient-to-b from-white via-zinc-100 to-zinc-200 text-zinc-950 font-bold border-white shadow-sm"
                       : "bg-zinc-950/70 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
                   }`}
                 >
@@ -432,7 +434,7 @@ export default function DatabaseBackupsView({ dbName }: DatabaseBackupsViewProps
 
             <div className="p-3 rounded-xl bg-zinc-950/60 border border-zinc-800/60 text-[11px] text-zinc-400 space-y-1.5">
               <div className="flex items-center gap-1.5 text-zinc-300 font-medium">
-                <Info className="w-3.5 h-3.5 text-purple-400" />
+                <Info className="w-3.5 h-3.5 text-zinc-400" />
                 <span>FIFO Sliding Window Rule</span>
               </div>
               <p className="leading-relaxed">
@@ -447,7 +449,7 @@ export default function DatabaseBackupsView({ dbName }: DatabaseBackupsViewProps
             {/* Next run & Status */}
             {schedule.next_run && schedule.enabled && (
               <div className="flex items-center gap-2 text-xs text-zinc-400 pt-1">
-                <Calendar className="w-3.5 h-3.5 text-indigo-400" />
+                <Calendar className="w-3.5 h-3.5 text-zinc-400" />
                 <span>Next scheduled run:</span>
                 <span className="text-zinc-200 font-mono font-medium">
                   {new Date(schedule.next_run).toLocaleString()}
@@ -462,14 +464,14 @@ export default function DatabaseBackupsView({ dbName }: DatabaseBackupsViewProps
           <button
             onClick={handleSaveSchedule}
             disabled={savingSchedule || !cronExplanation.isValid}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-100 text-xs font-medium border border-zinc-700/60 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-b from-zinc-100 via-zinc-200 to-zinc-300 hover:from-white hover:to-zinc-200 text-zinc-950 text-xs font-semibold border border-white/30 shadow-sm transition-all hover:scale-[1.01] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {savingSchedule ? (
-              <RefreshCw className="w-3.5 h-3.5 animate-spin text-purple-400" />
+              <RefreshCw className="w-3.5 h-3.5 animate-spin text-zinc-950" />
             ) : scheduleSuccess ? (
-              <Check className="w-3.5 h-3.5 text-emerald-400" />
+              <Check className="w-3.5 h-3.5 text-emerald-700 stroke-[2.5]" />
             ) : (
-              <CheckCircle2 className="w-3.5 h-3.5 text-purple-400" />
+              <CheckCircle2 className="w-3.5 h-3.5 text-zinc-950 stroke-[2]" />
             )}
             <span>{scheduleSuccess ? "Saved Successfully!" : "Save Schedule"}</span>
           </button>
@@ -520,7 +522,7 @@ export default function DatabaseBackupsView({ dbName }: DatabaseBackupsViewProps
         <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/30 overflow-hidden backdrop-blur-sm">
           {loading ? (
             <div className="p-12 text-center text-zinc-500 space-y-2">
-              <RefreshCw className="w-6 h-6 animate-spin mx-auto text-purple-400" />
+              <RefreshCw className="w-6 h-6 animate-spin mx-auto text-zinc-400" />
               <p className="text-xs">Loading snapshots for {dbName}...</p>
             </div>
           ) : filteredBackups.length === 0 ? (
@@ -550,7 +552,6 @@ export default function DatabaseBackupsView({ dbName }: DatabaseBackupsViewProps
                 </thead>
                 <tbody className="divide-y divide-zinc-800/50">
                   {filteredBackups.map((item) => {
-                    // Use parser to separate given name, date, time
                     const parsed = parseBackupFilename(item.filename, item.created_at);
 
                     return (
@@ -588,15 +589,15 @@ export default function DatabaseBackupsView({ dbName }: DatabaseBackupsViewProps
                           </div>
                         </td>
 
-                        {/* Type Badge */}
+                        {/* Type Badge (Soft Palette) */}
                         <td className="py-3.5 px-4">
                           {parsed.type === "auto" ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono uppercase bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono uppercase bg-emerald-500/10 border border-emerald-500/25 text-emerald-400">
                               <Clock className="w-3 h-3" />
                               Auto
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono uppercase bg-purple-500/10 border border-purple-500/30 text-purple-400">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono uppercase bg-sky-500/10 border border-sky-500/25 text-sky-300">
                               <FileCode2 className="w-3 h-3" />
                               Manual
                             </span>
@@ -617,10 +618,10 @@ export default function DatabaseBackupsView({ dbName }: DatabaseBackupsViewProps
                                 setBackupToRestore(item);
                                 setConfirmDbInput("");
                               }}
-                              className="px-2.5 py-1.5 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 hover:text-purple-200 border border-purple-500/30 font-medium text-xs flex items-center gap-1.5 transition-colors"
+                              className="px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 hover:text-white border border-zinc-700/80 font-medium text-xs flex items-center gap-1.5 transition-colors shadow-sm"
                               title="Restore this snapshot into database"
                             >
-                              <RotateCcw className="w-3.5 h-3.5" />
+                              <RotateCcw className="w-3.5 h-3.5 text-zinc-300" />
                               <span>Restore</span>
                             </button>
 
@@ -655,7 +656,7 @@ export default function DatabaseBackupsView({ dbName }: DatabaseBackupsViewProps
       </div>
 
       {/* ------------------------------------------------------------- */}
-      {/* MODAL 1: Create Backup Modal (Asks for backup name) */}
+      {/* MODAL 1: Create Backup Modal */}
       {/* ------------------------------------------------------------- */}
       <AnimatePresence>
         {isCreateModalOpen && (
@@ -668,7 +669,7 @@ export default function DatabaseBackupsView({ dbName }: DatabaseBackupsViewProps
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <div className="p-2 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400">
+                  <div className="p-2 rounded-xl bg-zinc-800 border border-zinc-700 text-zinc-200">
                     <Plus className="w-5 h-5" />
                   </div>
                   <h3 className="text-base font-semibold text-zinc-100">
@@ -694,7 +695,7 @@ export default function DatabaseBackupsView({ dbName }: DatabaseBackupsViewProps
                     value={customBackupName}
                     onChange={(e) => setCustomBackupName(e.target.value)}
                     placeholder="e.g. before-auth-migration, release-v2, clean-seed"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 focus:border-purple-500/50 focus:ring-1 focus:ring-purple-500/30 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 focus:border-zinc-500 focus:ring-1 focus:ring-zinc-400/20 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none"
                     autoFocus
                   />
                   <p className="text-[11px] text-zinc-500">
@@ -707,7 +708,7 @@ export default function DatabaseBackupsView({ dbName }: DatabaseBackupsViewProps
                   <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">
                     Generated Snapshot Name Preview:
                   </span>
-                  <div className="text-xs font-mono text-purple-300 break-all">
+                  <div className="text-xs font-mono text-zinc-200 break-all">
                     {customBackupName.trim()
                       ? customBackupName.trim().toLowerCase().replace(/[^a-z0-9_\-]+/g, "-")
                       : "your-name"}
@@ -729,16 +730,16 @@ export default function DatabaseBackupsView({ dbName }: DatabaseBackupsViewProps
                   <button
                     type="submit"
                     disabled={isCreatingBackup || !customBackupName.trim()}
-                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-medium text-xs shadow-lg shadow-purple-900/30 border border-purple-400/20 disabled:opacity-50 transition-all"
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-b from-white via-zinc-100 to-zinc-300 hover:from-white hover:to-zinc-200 text-zinc-950 font-semibold text-xs shadow-md border border-white/50 disabled:opacity-50 transition-all"
                   >
                     {isCreatingBackup ? (
                       <>
-                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin text-zinc-950" />
                         <span>Taking Snapshot...</span>
                       </>
                     ) : (
                       <>
-                        <Archive className="w-3.5 h-3.5" />
+                        <Archive className="w-3.5 h-3.5 text-zinc-950" />
                         <span>Take Backup</span>
                       </>
                     )}
@@ -751,7 +752,7 @@ export default function DatabaseBackupsView({ dbName }: DatabaseBackupsViewProps
       </AnimatePresence>
 
       {/* ------------------------------------------------------------- */}
-      {/* MODAL 2: Restore Confirmation Modal (Shows Parsed Name, Date, Time) */}
+      {/* MODAL 2: Restore Confirmation Modal */}
       {/* ------------------------------------------------------------- */}
       <AnimatePresence>
         {backupToRestore && (
@@ -760,7 +761,7 @@ export default function DatabaseBackupsView({ dbName }: DatabaseBackupsViewProps
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-lg rounded-2xl bg-zinc-900 border border-rose-900/40 p-6 shadow-2xl space-y-5"
+              className="w-full max-w-lg rounded-2xl bg-zinc-900 border border-zinc-800 p-6 shadow-2xl space-y-5"
             >
               {(() => {
                 const parsed = parseBackupFilename(backupToRestore.filename, backupToRestore.created_at);
@@ -768,7 +769,7 @@ export default function DatabaseBackupsView({ dbName }: DatabaseBackupsViewProps
                 return (
                   <>
                     <div className="flex items-center gap-3">
-                      <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400">
+                      <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/25 text-rose-400">
                         <ShieldAlert className="w-6 h-6" />
                       </div>
                       <div>
@@ -785,7 +786,7 @@ export default function DatabaseBackupsView({ dbName }: DatabaseBackupsViewProps
                     <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-3">
                       <div className="flex items-center justify-between border-b border-zinc-800/80 pb-2">
                         <span className="text-xs text-zinc-400">Backup Label:</span>
-                        <span className="text-sm font-semibold text-purple-300">
+                        <span className="text-sm font-semibold text-zinc-100">
                           {parsed.label}
                         </span>
                       </div>
@@ -816,7 +817,7 @@ export default function DatabaseBackupsView({ dbName }: DatabaseBackupsViewProps
                     </div>
 
                     {/* Safety Warning */}
-                    <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs text-rose-200 space-y-2">
+                    <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/25 text-xs text-rose-200 space-y-2">
                       <div className="flex items-center gap-2 font-semibold text-rose-300">
                         <AlertTriangle className="w-4 h-4 shrink-0" />
                         <span>Warning: Data Overwrite</span>
