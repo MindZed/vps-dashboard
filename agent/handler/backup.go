@@ -216,7 +216,32 @@ func (bm *BackupManager) getPostgresContainerName(ctx context.Context) string {
 
 // executeDump runs pg_dump natively or via docker
 func (bm *BackupManager) executeDump(ctx context.Context, dbName string, outPath string) error {
-	// Strategy 1: Check if docker exec is available
+	// Strategy 1: Direct native pg_dump command (Fastest & direct Swarm overlay network)
+	if _, err := exec.LookPath("pg_dump"); err == nil {
+		args := []string{
+			"-h", bm.Host,
+			"-p", bm.Port,
+			"-U", bm.User,
+			"-d", dbName,
+			"-F", "c",
+			"-Z", "9",
+			"-f", outPath,
+		}
+
+		cmd := exec.CommandContext(ctx, "pg_dump", args...)
+		cmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", bm.Password))
+		var stderr bytes.Buffer
+		cmd.Stderr = &stderr
+
+		if err := cmd.Run(); err == nil {
+			return nil
+		}
+		errMsg := strings.TrimSpace(stderr.String())
+		log.Printf("[DEBUG] direct pg_dump failed: %s, falling back to docker exec", errMsg)
+		_ = os.Remove(outPath)
+	}
+
+	// Strategy 2: Docker exec fallback
 	if _, err := exec.LookPath("docker"); err == nil {
 		targetContainer := bm.getPostgresContainerName(ctx)
 		outFile, err := os.Create(outPath)
@@ -240,42 +265,49 @@ func (bm *BackupManager) executeDump(ctx context.Context, dbName string, outPath
 			if runErr := cmd.Run(); runErr == nil {
 				return nil
 			}
-			log.Printf("[DEBUG] docker exec pg_dump failed: %s, falling back to local pg_dump", stderr.String())
+			log.Printf("[DEBUG] docker exec pg_dump failed: %s", stderr.String())
 			_ = os.Remove(outPath)
 		}
 	}
 
-	// Strategy 2: Direct pg_dump command
-	args := []string{
-		"-h", bm.Host,
-		"-p", bm.Port,
-		"-U", bm.User,
-		"-d", dbName,
-		"-F", "c",
-		"-Z", "9",
-		"-f", outPath,
-	}
-
-	cmd := exec.CommandContext(ctx, "pg_dump", args...)
-	cmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", bm.Password))
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
-		_ = os.Remove(outPath)
-		errMsg := strings.TrimSpace(stderr.String())
-		if errMsg == "" {
-			errMsg = err.Error()
-		}
-		return fmt.Errorf("pg_dump failed: %s", errMsg)
-	}
-
-	return nil
+	return fmt.Errorf("pg_dump failed: neither direct pg_dump nor docker exec succeeded")
 }
 
 // executeRestore runs pg_restore natively or via docker
 func (bm *BackupManager) executeRestore(ctx context.Context, dbName string, inPath string) error {
-	// Strategy 1: Try via docker exec if available
+	// Strategy 1: Direct native pg_restore command
+	if _, err := exec.LookPath("pg_restore"); err == nil {
+		args := []string{
+			"-h", bm.Host,
+			"-p", bm.Port,
+			"-U", bm.User,
+			"-d", dbName,
+			"--clean",
+			"--if-exists",
+			"--no-owner",
+			"--no-privileges",
+			inPath,
+		}
+
+		cmd := exec.CommandContext(ctx, "pg_restore", args...)
+		cmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", bm.Password))
+		var stderr bytes.Buffer
+		cmd.Stderr = &stderr
+
+		if err := cmd.Run(); err != nil {
+			errMsg := strings.TrimSpace(stderr.String())
+			if strings.Contains(errMsg, "fatal:") {
+				log.Printf("[DEBUG] direct pg_restore fatal error: %s, checking docker exec fallback", errMsg)
+			} else {
+				log.Printf("[WARN] pg_restore completed with notices: %s", errMsg)
+				return nil
+			}
+		} else {
+			return nil
+		}
+	}
+
+	// Strategy 2: Docker exec fallback
 	if _, err := exec.LookPath("docker"); err == nil {
 		targetContainer := bm.getPostgresContainerName(ctx)
 		inFile, err := os.Open(inPath)
@@ -299,39 +331,16 @@ func (bm *BackupManager) executeRestore(ctx context.Context, dbName string, inPa
 			if runErr := cmd.Run(); runErr == nil {
 				return nil
 			}
-			log.Printf("[DEBUG] docker exec pg_restore failed: %s, falling back to local pg_restore", stderr.String())
-		}
-	}
-
-	// Strategy 2: Direct pg_restore command
-	args := []string{
-		"-h", bm.Host,
-		"-p", bm.Port,
-		"-U", bm.User,
-		"-d", dbName,
-		"--clean",
-		"--if-exists",
-		"--no-owner",
-		"--no-privileges",
-		inPath,
-	}
-
-	cmd := exec.CommandContext(ctx, "pg_restore", args...)
-	cmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", bm.Password))
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
-		// pg_restore often exits with code 1 if warnings occur (e.g. drop table if not exists)
-		// check if it's fatal
-		errMsg := strings.TrimSpace(stderr.String())
-		if strings.Contains(errMsg, "fatal:") {
+			errMsg := strings.TrimSpace(stderr.String())
+			if !strings.Contains(errMsg, "fatal:") {
+				log.Printf("[WARN] docker pg_restore completed with notices: %s", errMsg)
+				return nil
+			}
 			return fmt.Errorf("pg_restore failed: %s", errMsg)
 		}
-		log.Printf("[WARN] pg_restore completed with notices: %s", errMsg)
 	}
 
-	return nil
+	return fmt.Errorf("pg_restore failed: neither direct pg_restore nor docker exec succeeded")
 }
 
 // pruneSlidingWindow keeps only the newest N automated backups for the database

@@ -23,18 +23,16 @@ RUN CGO_ENABLED=0 go build \
     main.go
 
 # -------------------------------------------------------------
-# Stage 2: Minimal Production Runtime (< 20MB)
+# Stage 2: Production Runtime with Native PostgreSQL 18 Client
 # -------------------------------------------------------------
-FROM alpine:3.20
-
-RUN apk add --no-cache ca-certificates tzdata wget postgresql-client docker-cli
+FROM postgres:18-bookworm
 
 WORKDIR /app
 
 # Create data and backup directories for persistence
 RUN mkdir -p /app/data /app/data/backups
 
-# Copy compiled binary from builder
+# Copy compiled Go binary from builder
 COPY --from=builder /bin/mindzed-agent /app/mindzed-agent
 RUN chmod +x /app/mindzed-agent
 
@@ -48,4 +46,5 @@ VOLUME ["/app/data"]
 EXPOSE 8080
 EXPOSE 8050
 
+ENTRYPOINT []
 CMD ["/app/mindzed-agent"]
