@@ -202,10 +202,23 @@ func ParseBackupFilename(filename string, sizeBytes int64) (*BackupItem, error) 
 	}, nil
 }
 
+// getPostgresContainerName finds the active container ID for PostgreSQL in Docker Swarm
+func (bm *BackupManager) getPostgresContainerName(ctx context.Context) string {
+	out, err := exec.CommandContext(ctx, "docker", "ps", "-q", "-f", "name=postgres-databases-sharedpostgres").Output()
+	if err == nil {
+		lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+		if len(lines) > 0 && lines[0] != "" {
+			return lines[0]
+		}
+	}
+	return bm.ContainerName
+}
+
 // executeDump runs pg_dump natively or via docker
 func (bm *BackupManager) executeDump(ctx context.Context, dbName string, outPath string) error {
 	// Strategy 1: Check if docker exec is available
 	if _, err := exec.LookPath("docker"); err == nil {
+		targetContainer := bm.getPostgresContainerName(ctx)
 		outFile, err := os.Create(outPath)
 		if err == nil {
 			defer outFile.Close()
@@ -213,20 +226,16 @@ func (bm *BackupManager) executeDump(ctx context.Context, dbName string, outPath
 			args := []string{
 				"exec",
 				"-i",
-				bm.ContainerName,
-				"pg_dump",
-				"-U", bm.User,
-				"-d", dbName,
-				"-F", "c",
-				"-Z", "9",
 			}
+			if bm.Password != "" {
+				args = append(args, "-e", fmt.Sprintf("PGPASSWORD=%s", bm.Password))
+			}
+			args = append(args, targetContainer, "pg_dump", "-U", bm.User, "-d", dbName, "-F", "c", "-Z", "9")
+
 			cmd := exec.CommandContext(ctx, "docker", args...)
 			cmd.Stdout = outFile
 			var stderr bytes.Buffer
 			cmd.Stderr = &stderr
-			if bm.Password != "" {
-				cmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", bm.Password))
-			}
 
 			if runErr := cmd.Run(); runErr == nil {
 				return nil
@@ -268,6 +277,7 @@ func (bm *BackupManager) executeDump(ctx context.Context, dbName string, outPath
 func (bm *BackupManager) executeRestore(ctx context.Context, dbName string, inPath string) error {
 	// Strategy 1: Try via docker exec if available
 	if _, err := exec.LookPath("docker"); err == nil {
+		targetContainer := bm.getPostgresContainerName(ctx)
 		inFile, err := os.Open(inPath)
 		if err == nil {
 			defer inFile.Close()
@@ -275,22 +285,16 @@ func (bm *BackupManager) executeRestore(ctx context.Context, dbName string, inPa
 			args := []string{
 				"exec",
 				"-i",
-				bm.ContainerName,
-				"pg_restore",
-				"-U", bm.User,
-				"-d", dbName,
-				"--clean",
-				"--if-exists",
-				"--no-owner",
-				"--no-privileges",
 			}
+			if bm.Password != "" {
+				args = append(args, "-e", fmt.Sprintf("PGPASSWORD=%s", bm.Password))
+			}
+			args = append(args, targetContainer, "pg_restore", "-U", bm.User, "-d", dbName, "--clean", "--if-exists", "--no-owner", "--no-privileges")
+
 			cmd := exec.CommandContext(ctx, "docker", args...)
 			cmd.Stdin = inFile
 			var stderr bytes.Buffer
 			cmd.Stderr = &stderr
-			if bm.Password != "" {
-				cmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", bm.Password))
-			}
 
 			if runErr := cmd.Run(); runErr == nil {
 				return nil
