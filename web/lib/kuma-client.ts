@@ -37,25 +37,7 @@ export interface KumaStatusResponse {
 export async function fetchKumaStatus(): Promise<KumaStatusResponse> {
   const kumaUrl = process.env.NEXT_PUBLIC_KUMA_URL;
 
-  if (kumaUrl) {
-    try {
-      const res = await fetch(`${kumaUrl}/api/status-page/heartbeat/mindzed`, {
-        headers: { Accept: "application/json" },
-        next: { revalidate: 30 },
-      });
-      if (res.ok) {
-        const raw = await res.json();
-        // Transform raw Kuma format if needed or return mapped
-        if (raw && raw.heartbeatList) {
-          // Process real Kuma heartbeats
-        }
-      }
-    } catch {
-      // Fall through to mock
-    }
-  }
-
-  // Realistic mock data for the 4 core targets
+  // Realistic mock data generator helper
   const now = Date.now();
   const generateHeartbeats = (basePing: number, failureRate = 0): Heartbeat[] => {
     return Array.from({ length: 30 }).map((_, i) => {
@@ -67,6 +49,76 @@ export async function fetchKumaStatus(): Promise<KumaStatusResponse> {
       };
     });
   };
+
+  if (kumaUrl) {
+    try {
+      const [heartbeatRes, pageRes] = await Promise.all([
+        fetch(`${kumaUrl}/api/status-page/heartbeat/mindzed`, {
+          headers: { Accept: "application/json" },
+          next: { revalidate: 30 },
+        }),
+        fetch(`${kumaUrl}/api/status-page/mindzed`, {
+          headers: { Accept: "application/json" },
+          next: { revalidate: 30 },
+        }),
+      ]);
+
+      if (heartbeatRes.ok && pageRes.ok) {
+        const heartbeatData = await heartbeatRes.json();
+        const pageData = await pageRes.json();
+
+        if (pageData && pageData.publicGroupList) {
+          const liveMonitors: KumaMonitor[] = [];
+          for (const group of pageData.publicGroupList) {
+            for (const m of group.monitorList || []) {
+              const rawHbs = heartbeatData.heartbeatList?.[m.id] || [];
+              const hbs: Heartbeat[] = rawHbs.slice(-30).map((h: any) => ({
+                status: h.status === 1 ? 1 : 0,
+                time: h.time,
+                ping: h.ping || 0,
+              }));
+
+              const up24 = heartbeatData.uptimeList?.[`${m.id}_24`] != null 
+                ? Number((heartbeatData.uptimeList[`${m.id}_24`] * 100).toFixed(2)) 
+                : 100;
+              const up720 = heartbeatData.uptimeList?.[`${m.id}_720`] != null 
+                ? Number((heartbeatData.uptimeList[`${m.id}_720`] * 100).toFixed(2)) 
+                : 99.9;
+
+              const lastHb = hbs[hbs.length - 1];
+
+              liveMonitors.push({
+                id: String(m.id),
+                name: m.name,
+                url: m.url || m.hostname || "Endpoint",
+                type: (m.type || "http").toUpperCase(),
+                status: lastHb ? (lastHb.status === 1 ? "up" : "down") : "up",
+                currentPing: lastHb?.ping || 0,
+                uptime24h: up24,
+                uptime30d: up720,
+                heartbeats: hbs.length > 0 ? hbs : generateHeartbeats(20),
+              });
+            }
+          }
+
+          if (liveMonitors.length > 0) {
+            const avgUptime = Number(
+              (liveMonitors.reduce((acc, m) => acc + m.uptime30d, 0) / liveMonitors.length).toFixed(2)
+            );
+            return {
+              overallUptime: avgUptime,
+              monitors: liveMonitors,
+              incidents: pageData.incident ? [pageData.incident] : [],
+              lastUpdated: new Date().toISOString(),
+              isMock: false,
+            };
+          }
+        }
+      }
+    } catch {
+      // Fall through to mock
+    }
+  }
 
   const monitors: KumaMonitor[] = [
     {

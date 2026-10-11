@@ -151,7 +151,7 @@ func classifyBindIP(ip string) string {
 func GetNetworkPortsHandler(c *gin.Context) {
 	connections, err := psutilnet.Connections("tcp")
 	seenPorts := make(map[uint32]bool)
-	var ports []ListeningPort
+	ports := make([]ListeningPort, 0)
 
 	if err == nil {
 		for _, conn := range connections {

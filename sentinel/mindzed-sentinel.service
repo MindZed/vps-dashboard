@@ -1,0 +1,28 @@
+[Unit]
+Description=MindZed Sentinel (Enterprise Micro Watchdog Daemon)
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/mindzed-sentinel
+ExecStart=/opt/mindzed-sentinel/mindzed-sentinel
+Restart=always
+RestartSec=3s
+Environment=PORT=8085
+Environment=BIND_HOST=127.0.0.1
+Environment=SENTINEL_DB_PATH=/opt/mindzed-sentinel/data/sentinel.db
+Environment=SENTINEL_SECRET=dfb2bd78acdzfdxarf379161b46bd31e0890610fab9028x1
+
+# Hardened Security Sandbox
+ProtectSystem=full
+NoNewPrivileges=true
+PrivateTmp=true
+
+# Strict Memory Cap (< 35MB RAM, < 10% CPU on 1GB Micro VPS)
+MemoryMax=35M
+CPUQuota=10%
+
+[Install]
+WantedBy=multi-user.target

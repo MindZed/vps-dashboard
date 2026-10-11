@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { 
   ShieldCheck, 
   Radio, 
@@ -12,7 +12,10 @@ import {
   AlertTriangle,
   CheckCircle2,
   Terminal,
-  Activity
+  Activity,
+  Search,
+  Filter,
+  X
 } from "lucide-react";
 import { fetchNetworkPorts, NetworkPortsResponse } from "@/lib/agent-client";
 
@@ -21,11 +24,15 @@ export default function PortsSecurityPage() {
   const [loading, setLoading] = useState(true);
   const [isScanning, setIsScanning] = useState(false);
   const [lastScanTime, setLastScanTime] = useState<string>("");
+  const [isMock, setIsMock] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [exposureFilter, setExposureFilter] = useState<"all" | "public_exposed" | "docker_internal" | "safe_local">("all");
 
   const loadPorts = async () => {
     try {
       const res = await fetchNetworkPorts();
       setData(res.data);
+      setIsMock(res.isMock);
       setLastScanTime(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
     } catch (e) {
       console.error("Failed to load ports", e);
@@ -47,6 +54,24 @@ export default function PortsSecurityPage() {
     return () => clearInterval(interval);
   }, []);
 
+  const portsList = data?.ports ?? [];
+
+  const filteredPorts = useMemo(() => {
+    return portsList.filter((p) => {
+      const matchesSearch =
+        searchQuery.trim() === "" ||
+        p.port.toString().includes(searchQuery.trim()) ||
+        p.service.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        p.bind_ip.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        p.protocol.toLowerCase().includes(searchQuery.toLowerCase());
+
+      const matchesFilter =
+        exposureFilter === "all" || p.status === exposureFilter;
+
+      return matchesSearch && matchesFilter;
+    });
+  }, [portsList, searchQuery, exposureFilter]);
+
   return (
     <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 sm:space-y-8 animate-in fade-in duration-200">
       {/* Header */}
@@ -56,8 +81,12 @@ export default function PortsSecurityPage() {
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white flex items-center gap-2">
               Network Ports & Security
             </h1>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-mono uppercase bg-zinc-800 border border-zinc-700 text-zinc-300">
-              Kernel Sockets
+            <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono uppercase border ${
+              isMock 
+                ? "bg-amber-500/10 border-amber-500/30 text-amber-400" 
+                : "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 font-semibold"
+            }`}>
+              {isMock ? "Simulated Mode" : "Live Kernel Sockets"}
             </span>
           </div>
           <p className="text-xs text-zinc-400">
@@ -83,10 +112,17 @@ export default function PortsSecurityPage() {
         </div>
       </div>
 
-      {/* Security Summary Cards with Soft Indicator Colors */}
+      {/* Security Summary Cards with Soft Indicator Colors (Clickable Filters) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Card 1: Total Listening */}
-        <div className="rounded-2xl bg-zinc-900/30 border border-zinc-800/80 p-4 backdrop-blur-sm flex items-center justify-between">
+        <div 
+          onClick={() => setExposureFilter("all")}
+          className={`rounded-2xl border p-4 backdrop-blur-sm flex items-center justify-between transition-all cursor-pointer ${
+            exposureFilter === "all" 
+              ? "bg-zinc-800/60 border-zinc-600 ring-1 ring-zinc-500" 
+              : "bg-zinc-900/30 border-zinc-800/80 hover:border-zinc-700"
+          }`}
+        >
           <div className="space-y-0.5">
             <span className="text-[10px] text-zinc-500 font-mono block">TOTAL LISTENING</span>
             <div className="text-xl font-bold font-mono text-white">{data?.total_listening ?? 0} Ports</div>
@@ -97,7 +133,14 @@ export default function PortsSecurityPage() {
         </div>
 
         {/* Card 2: Publicly Exposed */}
-        <div className="rounded-2xl bg-zinc-900/30 border border-zinc-800/80 p-4 backdrop-blur-sm flex items-center justify-between">
+        <div 
+          onClick={() => setExposureFilter("public_exposed")}
+          className={`rounded-2xl border p-4 backdrop-blur-sm flex items-center justify-between transition-all cursor-pointer ${
+            exposureFilter === "public_exposed" 
+              ? "bg-amber-950/20 border-amber-500/60 ring-1 ring-amber-500/40" 
+              : "bg-zinc-900/30 border-zinc-800/80 hover:border-zinc-700"
+          }`}
+        >
           <div className="space-y-0.5">
             <span className="text-[10px] text-zinc-500 font-mono block">PUBLIC EXPOSURE (0.0.0.0)</span>
             <div className="text-xl font-bold font-mono text-amber-400">{data?.public_exposed ?? 0} Ports</div>
@@ -108,7 +151,14 @@ export default function PortsSecurityPage() {
         </div>
 
         {/* Card 3: Docker Internal */}
-        <div className="rounded-2xl bg-zinc-900/30 border border-zinc-800/80 p-4 backdrop-blur-sm flex items-center justify-between">
+        <div 
+          onClick={() => setExposureFilter("docker_internal")}
+          className={`rounded-2xl border p-4 backdrop-blur-sm flex items-center justify-between transition-all cursor-pointer ${
+            exposureFilter === "docker_internal" 
+              ? "bg-sky-950/20 border-sky-500/60 ring-1 ring-sky-500/40" 
+              : "bg-zinc-900/30 border-zinc-800/80 hover:border-zinc-700"
+          }`}
+        >
           <div className="space-y-0.5">
             <span className="text-[10px] text-zinc-500 font-mono block">DOCKER SWARM INTERNAL</span>
             <div className="text-xl font-bold font-mono text-sky-400">{data?.docker_internal ?? 0} Ports</div>
@@ -119,7 +169,14 @@ export default function PortsSecurityPage() {
         </div>
 
         {/* Card 4: Safe Local Only */}
-        <div className="rounded-2xl bg-zinc-900/30 border border-zinc-800/80 p-4 backdrop-blur-sm flex items-center justify-between">
+        <div 
+          onClick={() => setExposureFilter("safe_local")}
+          className={`rounded-2xl border p-4 backdrop-blur-sm flex items-center justify-between transition-all cursor-pointer ${
+            exposureFilter === "safe_local" 
+              ? "bg-emerald-950/20 border-emerald-500/60 ring-1 ring-emerald-500/40" 
+              : "bg-zinc-900/30 border-zinc-800/80 hover:border-zinc-700"
+          }`}
+        >
           <div className="space-y-0.5">
             <span className="text-[10px] text-zinc-500 font-mono block">SAFE LOCAL (127.0.0.1)</span>
             <div className="text-xl font-bold font-mono text-emerald-400">{data?.safe_local ?? 0} Ports</div>
@@ -154,6 +211,76 @@ export default function PortsSecurityPage() {
         </div>
       </div>
 
+      {/* Filters and Search Bar */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        {/* Search */}
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-500" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search port number, service name, or bind IP..."
+            className="w-full pl-9 pr-8 py-2 rounded-xl bg-zinc-900/40 border border-zinc-800 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-600 transition-colors font-mono"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded text-zinc-400 hover:text-white"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          )}
+        </div>
+
+        {/* Filter buttons */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 text-xs font-mono">
+          <button
+            onClick={() => setExposureFilter("all")}
+            className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-all ${
+              exposureFilter === "all"
+                ? "bg-zinc-800 border-zinc-600 text-white shadow-sm"
+                : "bg-zinc-900/30 border-zinc-800/80 text-zinc-400 hover:text-zinc-200"
+            }`}
+          >
+            All ({portsList.length})
+          </button>
+          <button
+            onClick={() => setExposureFilter("public_exposed")}
+            className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-all flex items-center gap-1.5 ${
+              exposureFilter === "public_exposed"
+                ? "bg-amber-500/10 border-amber-500/40 text-amber-300"
+                : "bg-zinc-900/30 border-zinc-800/80 text-zinc-400 hover:text-zinc-200"
+            }`}
+          >
+            <Globe className="h-3 w-3 text-amber-400" />
+            Public ({data?.public_exposed ?? 0})
+          </button>
+          <button
+            onClick={() => setExposureFilter("docker_internal")}
+            className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-all flex items-center gap-1.5 ${
+              exposureFilter === "docker_internal"
+                ? "bg-sky-500/10 border-sky-500/40 text-sky-300"
+                : "bg-zinc-900/30 border-zinc-800/80 text-zinc-400 hover:text-zinc-200"
+            }`}
+          >
+            <Server className="h-3 w-3 text-sky-400" />
+            Docker ({data?.docker_internal ?? 0})
+          </button>
+          <button
+            onClick={() => setExposureFilter("safe_local")}
+            className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-all flex items-center gap-1.5 ${
+              exposureFilter === "safe_local"
+                ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-300"
+                : "bg-zinc-900/30 border-zinc-800/80 text-zinc-400 hover:text-zinc-200"
+            }`}
+          >
+            <Lock className="h-3 w-3 text-emerald-400" />
+            Safe Local ({data?.safe_local ?? 0})
+          </button>
+        </div>
+      </div>
+
       {/* Ports Table */}
       <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/20 backdrop-blur-sm overflow-hidden shadow-lg">
         <div className="overflow-x-auto">
@@ -177,10 +304,21 @@ export default function PortsSecurityPage() {
                     </div>
                   </td>
                 </tr>
+              ) : filteredPorts.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-5 py-8 text-center text-zinc-500">
+                    {searchQuery || exposureFilter !== "all" 
+                      ? "No listening ports match the selected filter or search query." 
+                      : "No active listening TCP sockets detected on the server."}
+                  </td>
+                </tr>
               ) : (
-                data?.ports.map((p) => {
+                filteredPorts.map((p) => {
                   return (
-                    <tr key={p.port} className="hover:bg-zinc-850/30 transition-colors">
+                    <tr 
+                      key={`${p.protocol}-${p.port}-${p.bind_ip}`} 
+                      className="hover:bg-zinc-850/30 transition-colors"
+                    >
                       {/* Port */}
                       <td className="px-5 py-3.5">
                         <span className="font-bold text-white text-xs bg-zinc-800 border border-zinc-700 px-2 py-0.5 rounded">

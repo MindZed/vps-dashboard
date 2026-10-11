@@ -14,7 +14,7 @@ import {
   Network
 } from "lucide-react";
 import { fetchSystemVitals, SystemVitals, fetchDatabases } from "@/lib/agent-client";
-import { fetchKumaStatus } from "@/lib/kuma-client";
+import { fetchWatchdogStatus } from "@/lib/sentinel-client";
 import { ResourceDataPoint } from "@/components/charts/ResourceHistory";
 
 // Dynamic imports for ECharts to ensure SSR safety
@@ -93,7 +93,7 @@ export default function OverviewPage() {
   useEffect(() => {
     pollVitals();
     fetchDatabases().then((r) => setDbCount(r.databases.length));
-    fetchKumaStatus().then((r) => setKumaUptime(r.overallUptime));
+    fetchWatchdogStatus().then((r) => setKumaUptime(r.overall_uptime));
 
     const interval = setInterval(pollVitals, 3500);
     return () => clearInterval(interval);
@@ -290,7 +290,7 @@ export default function OverviewPage() {
             {kumaUptime}% <span className="text-xs text-zinc-500 font-sans font-normal">Availability</span>
           </div>
           <p className="text-xs text-zinc-400">
-            External heartbeat monitoring (GCP).
+            External heartbeat monitoring (Oracle Micro Sentinel).
           </p>
         </Link>
       </div>
