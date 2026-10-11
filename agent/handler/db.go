@@ -432,18 +432,23 @@ func (m *DBManager) CloneDatabase(c *gin.Context) {
 		targetDb = fmt.Sprintf("%s_%d", baseTarget, i)
 	}
 
-	// Owner role
-	userName := srcOwner
-	if userName == "" || userName == "postgres" || userName == "unknown" {
-		if strings.HasPrefix(targetDb, "db_") {
-			parts := strings.Split(targetDb, "_")
-			if len(parts) >= 3 {
-				userName = fmt.Sprintf("usr_%s", strings.Join(parts[1:len(parts)-1], "_"))
-			} else {
-				userName = fmt.Sprintf("usr_%s", targetDb)
-			}
-		} else {
-			userName = fmt.Sprintf("usr_%s", targetDb)
+	// Dedicated owner role for clone so source user/passwords are NEVER modified or compromised!
+	userName := fmt.Sprintf("usr_%s", strings.TrimPrefix(targetDb, "db_"))
+	if len(userName) > 60 {
+		userName = userName[:60]
+	}
+	if !sanitizeIdentifier(userName) {
+		userName = fmt.Sprintf("usr_%s_%s", srcOwner, env)
+		if len(userName) > 60 {
+			userName = userName[:60]
+		}
+	}
+
+	// Safety guard: NEVER allow modifying or resetting the password of the source database owner!
+	if (userName == srcOwner || userName == "usr_school_erp" || userName == "postgres") && srcOwner != "postgres" {
+		userName = fmt.Sprintf("usr_%s_%s", strings.TrimPrefix(targetDb, "db_"), "clone")
+		if len(userName) > 60 {
+			userName = userName[:60]
 		}
 	}
 
@@ -453,7 +458,7 @@ func (m *DBManager) CloneDatabase(c *gin.Context) {
 		return
 	}
 
-	// Configure role with password
+	// Configure dedicated clone role with password
 	userSQL := fmt.Sprintf(`
 		DO $$
 		BEGIN
