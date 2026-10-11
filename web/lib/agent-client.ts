@@ -464,6 +464,98 @@ export async function createDatabaseApi(
   return { data: mockResponse, isMock: true };
 }
 
+export interface CloneDatabaseRequest {
+  source_database: string;
+  target_database?: string;
+  environment?: string; // defaults to "test"
+}
+
+export async function cloneDatabaseApi(
+  req: CloneDatabaseRequest
+): Promise<{ data: CreateDatabaseResponse; isMock: boolean }> {
+  const config = getAgentConfig();
+
+  if (!config.forceDemo) {
+    try {
+      const res = await fetch(getApiEndpoint("databases/clone"), {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify(req),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        saveDatabaseCredentials(data.database, data.username, data.password);
+        return { data, isMock: false };
+      }
+      const err = await res.json().catch(() => ({ error: "Request failed" }));
+      throw new Error(err.error || "Failed to clone database");
+    } catch (e: unknown) {
+      const errMsg = e instanceof Error ? e.message : String(e);
+      if (!errMsg.includes("fetch")) {
+        throw e;
+      }
+    }
+  }
+
+  // Mock fallback
+  const src = req.source_database;
+  const env = req.environment || "test";
+  let targetDb = req.target_database || "";
+  if (!targetDb) {
+    if (src.startsWith("db_")) {
+      const parts = src.split("_");
+      if (parts.length >= 3) {
+        const proj = parts.slice(1, parts.length - 1).join("_");
+        targetDb = `db_${proj}_${env}`;
+      } else {
+        targetDb = `${src}_${env}`;
+      }
+    } else {
+      targetDb = `db_${src}_${env}`;
+    }
+  }
+
+  // Ensure unique target in mock
+  const baseTarget = targetDb;
+  let counter = 1;
+  while (mockDatabases.some((d) => d.name === targetDb)) {
+    targetDb = `${baseTarget}_${counter}`;
+    counter++;
+  }
+
+  const parts = targetDb.split("_");
+  const proj = parts.length >= 3 ? parts.slice(1, parts.length - 1).join("_") : targetDb;
+  const userName = `usr_${proj}`;
+  const password = generateSecretKey().slice(0, 32);
+
+  const mockResponse: CreateDatabaseResponse = {
+    success: true,
+    database: targetDb,
+    username: userName,
+    password,
+    connections: {
+      dokploy_internal: `postgresql://${userName}:${password}@postgres-databases-sharedpostgres-kooq42:5432/${targetDb}`,
+      ssh_tunnel: `postgresql://${userName}:${password}@localhost:5433/${targetDb}`,
+      external_vercel: `postgresql://${userName}:${password}@vps-host:6432/${targetDb}?sslmode=disable`,
+    },
+    created_at: new Date().toISOString(),
+  };
+
+  mockDatabases.unshift({
+    name: targetDb,
+    owner: userName,
+    size_bytes: 8388608,
+    size_mb: 8.0,
+    environment: env,
+    project: proj,
+    active_connections: 0,
+    connections: mockResponse.connections,
+  });
+
+  return { data: mockResponse, isMock: true };
+}
+
 export async function deleteDatabaseApi(name: string): Promise<{ success: boolean; isMock: boolean }> {
   const config = getAgentConfig();
 

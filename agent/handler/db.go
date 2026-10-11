@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/json"
@@ -8,7 +9,9 @@ import (
 	"math"
 	"math/big"
 	"net/http"
+	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -34,6 +37,8 @@ type DBManager struct {
 	SSHPort       string
 	WhitelistFile string
 	whitelistMu   sync.RWMutex
+	MasterUser    string
+	MasterPass    string
 }
 
 // WhitelistData structure stored in the JSON file
@@ -49,8 +54,8 @@ type WhitelistUser struct {
 	AddedAt  string `json:"added_at"`
 }
 
-// NewDBManager initializes a new DBManager with environment variables.
-func NewDBManager(pool *pgxpool.Pool) *DBManager {
+// NewDBManager initializes a new DBManager with environment variables and connection string.
+func NewDBManager(pool *pgxpool.Pool, rawConnStr string) *DBManager {
 	internalHost := os.Getenv("PG_INTERNAL_HOST")
 	if internalHost == "" || internalHost == "postgres" || internalHost == "localhost" {
 		internalHost = "postgres-databases-sharedpostgres-kooq42"
@@ -81,6 +86,31 @@ func NewDBManager(pool *pgxpool.Pool) *DBManager {
 		whitelistFile = "whitelist.json"
 	}
 
+	masterUser := os.Getenv("PG_USER")
+	if masterUser == "" {
+		masterUser = "postgres"
+	}
+	masterPass := os.Getenv("PG_PASSWORD")
+
+	if rawConnStr != "" {
+		if u, err := url.Parse(rawConnStr); err == nil {
+			if u.Hostname() != "" && u.Hostname() != "postgres" && u.Hostname() != "localhost" {
+				internalHost = u.Hostname()
+			}
+			if u.Port() != "" {
+				port = u.Port()
+			}
+			if u.User != nil {
+				if u.User.Username() != "" {
+					masterUser = u.User.Username()
+				}
+				if pass, ok := u.User.Password(); ok {
+					masterPass = pass
+				}
+			}
+		}
+	}
+
 	return &DBManager{
 		Pool:          pool,
 		InternalHost:  internalHost,
@@ -89,6 +119,8 @@ func NewDBManager(pool *pgxpool.Pool) *DBManager {
 		PGBouncerPort: pgBouncerPort,
 		SSHPort:       sshPort,
 		WhitelistFile: whitelistFile,
+		MasterUser:    masterUser,
+		MasterPass:    masterPass,
 	}
 }
 
@@ -312,6 +344,207 @@ func (m *DBManager) CreateDatabase(c *gin.Context) {
 	c.JSON(http.StatusCreated, CreateDatabaseResponse{
 		Success:     true,
 		Database:    dbName,
+		Username:    userName,
+		Password:    password,
+		Connections: connections,
+		CreatedAt:   time.Now().UTC().Format(time.RFC3339),
+	})
+}
+
+// CloneDatabaseRequest payload
+type CloneDatabaseRequest struct {
+	SourceDatabase string `json:"source_database" binding:"required"`
+	TargetDatabase string `json:"target_database"`
+	Environment    string `json:"environment"`
+}
+
+// CloneDatabase creates an isolated testing or staging clone of an existing database
+func (m *DBManager) CloneDatabase(c *gin.Context) {
+	if m.Pool == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "PostgreSQL pool is not connected"})
+		return
+	}
+
+	var req CloneDatabaseRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "source_database is required"})
+		return
+	}
+
+	srcDb := strings.TrimSpace(req.SourceDatabase)
+	if !sanitizeIdentifier(srcDb) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "source_database contains invalid characters"})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 90*time.Second)
+	defer cancel()
+
+	var srcExists bool
+	var srcOwner string
+	err := m.Pool.QueryRow(ctx, `
+		SELECT 
+			EXISTS(SELECT 1 FROM pg_database WHERE datname = $1),
+			COALESCE((SELECT pg_catalog.pg_get_userbyid(datdba) FROM pg_database WHERE datname = $1), 'postgres')
+	`, srcDb).Scan(&srcExists, &srcOwner)
+	if err != nil || !srcExists {
+		c.JSON(http.StatusNotFound, gin.H{"error": fmt.Sprintf("Source database '%s' does not exist", srcDb)})
+		return
+	}
+
+	env := strings.ToLower(strings.TrimSpace(req.Environment))
+	if env == "" {
+		env = "test"
+	}
+	if !sanitizeIdentifier(env) {
+		env = "test"
+	}
+
+	targetDb := strings.ToLower(strings.TrimSpace(req.TargetDatabase))
+	if targetDb == "" {
+		// Auto-derive target name from source database
+		if strings.HasPrefix(srcDb, "db_") {
+			parts := strings.Split(srcDb, "_")
+			if len(parts) >= 3 {
+				proj := strings.Join(parts[1:len(parts)-1], "_")
+				targetDb = fmt.Sprintf("db_%s_%s", proj, env)
+			} else {
+				targetDb = fmt.Sprintf("%s_%s", srcDb, env)
+			}
+		} else {
+			targetDb = fmt.Sprintf("db_%s_%s", srcDb, env)
+		}
+	}
+
+	if !sanitizeIdentifier(targetDb) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "target_database must contain only alphanumeric characters and underscores"})
+		return
+	}
+
+	// If target database already exists, find next available suffix: db_xxx_test_1, db_xxx_test_2
+	baseTarget := targetDb
+	for i := 1; i <= 50; i++ {
+		var exists bool
+		_ = m.Pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM pg_database WHERE datname = $1)", targetDb).Scan(&exists)
+		if !exists {
+			break
+		}
+		targetDb = fmt.Sprintf("%s_%d", baseTarget, i)
+	}
+
+	// Owner role
+	userName := srcOwner
+	if userName == "" || userName == "postgres" || userName == "unknown" {
+		if strings.HasPrefix(targetDb, "db_") {
+			parts := strings.Split(targetDb, "_")
+			if len(parts) >= 3 {
+				userName = fmt.Sprintf("usr_%s", strings.Join(parts[1:len(parts)-1], "_"))
+			} else {
+				userName = fmt.Sprintf("usr_%s", targetDb)
+			}
+		} else {
+			userName = fmt.Sprintf("usr_%s", targetDb)
+		}
+	}
+
+	password, err := generateSecurePassword(32)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate secure password"})
+		return
+	}
+
+	// Configure role with password
+	userSQL := fmt.Sprintf(`
+		DO $$
+		BEGIN
+			IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '%s') THEN
+				CREATE USER "%s" WITH ENCRYPTED PASSWORD '%s';
+			ELSE
+				ALTER USER "%s" WITH ENCRYPTED PASSWORD '%s';
+			END IF;
+		END
+		$$;
+	`, userName, userName, password, userName, password)
+	if _, err := m.Pool.Exec(ctx, userSQL); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to configure database user: %v", err)})
+		return
+	}
+
+	// Execute clone
+	// Method 1: Check active connections. If 0, use instant TEMPLATE copy
+	var activeConns int
+	_ = m.Pool.QueryRow(ctx, "SELECT count(*) FROM pg_stat_activity WHERE datname = $1 AND pid <> pg_backend_pid()", srcDb).Scan(&activeConns)
+
+	cloned := false
+	if activeConns == 0 {
+		cloneSQL := fmt.Sprintf(`CREATE DATABASE "%s" WITH TEMPLATE "%s" OWNER "%s"`, targetDb, srcDb, userName)
+		if _, err := m.Pool.Exec(ctx, cloneSQL); err == nil {
+			cloned = true
+		}
+	}
+
+	if !cloned {
+		// Method 2: Create empty DB and stream snapshot via pg_dump | psql (Non-blocking MVCC copy)
+		createDbSQL := fmt.Sprintf(`CREATE DATABASE "%s" OWNER "%s"`, targetDb, userName)
+		if _, err := m.Pool.Exec(ctx, createDbSQL); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to create target database: %v", err)})
+			return
+		}
+
+		dumpArgs := []string{
+			"-h", m.InternalHost,
+			"-p", m.Port,
+			"-U", m.MasterUser,
+			"-d", srcDb,
+			"--no-owner",
+			"--no-privileges",
+		}
+		dumpCmd := exec.CommandContext(ctx, "pg_dump", dumpArgs...)
+		if m.MasterPass != "" {
+			dumpCmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", m.MasterPass))
+		}
+
+		restoreArgs := []string{
+			"-h", m.InternalHost,
+			"-p", m.Port,
+			"-U", m.MasterUser,
+			"-d", targetDb,
+			"-q",
+		}
+		restoreCmd := exec.CommandContext(ctx, "psql", restoreArgs...)
+		if m.MasterPass != "" {
+			restoreCmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", m.MasterPass))
+		}
+
+		pipe, pipeErr := dumpCmd.StdoutPipe()
+		if pipeErr == nil {
+			restoreCmd.Stdin = pipe
+			var dumpErrBuf, restoreErrBuf bytes.Buffer
+			dumpCmd.Stderr = &dumpErrBuf
+			restoreCmd.Stderr = &restoreErrBuf
+
+			if startErr := dumpCmd.Start(); startErr == nil {
+				if startRestErr := restoreCmd.Start(); startRestErr == nil {
+					_ = dumpCmd.Wait()
+					_ = restoreCmd.Wait()
+				}
+			}
+		}
+	}
+
+	// Ensure privileges
+	grantSQL := fmt.Sprintf(`GRANT ALL PRIVILEGES ON DATABASE "%s" TO "%s"`, targetDb, userName)
+	_, _ = m.Pool.Exec(ctx, grantSQL)
+
+	connections := ConnectionURLs{
+		DokployInternal: fmt.Sprintf("postgresql://%s:%s@%s:%s/%s", userName, password, m.InternalHost, m.Port, targetDb),
+		SSHTunnel:       fmt.Sprintf("postgresql://%s:%s@localhost:%s/%s", userName, password, m.SSHPort, targetDb),
+		ExternalVercel:  fmt.Sprintf("postgresql://%s:%s@%s:%s/%s?sslmode=disable", userName, password, m.ExternalHost, m.PGBouncerPort, targetDb),
+	}
+
+	c.JSON(http.StatusCreated, CreateDatabaseResponse{
+		Success:     true,
+		Database:    targetDb,
 		Username:    userName,
 		Password:    password,
 		Connections: connections,

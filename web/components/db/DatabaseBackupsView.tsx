@@ -20,6 +20,7 @@ import {
   CheckCircle2,
   X,
   FileCode2,
+  FlaskConical,
 } from "lucide-react";
 import {
   BackupItem,
@@ -294,6 +295,21 @@ export default function DatabaseBackupsView({ dbName }: DatabaseBackupsViewProps
           </button>
         </div>
       </div>
+
+      {/* Ephemeral Test Database Note */}
+      {dbName.includes("_test") && (
+        <div className="p-4 rounded-2xl bg-purple-500/10 border border-purple-500/25 text-purple-200 text-xs flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <FlaskConical className="h-4 w-4 text-purple-400 shrink-0" />
+            <div>
+              <span className="font-semibold text-purple-300 block">Ephemeral Testing Database</span>
+              <span className="text-[11px] text-purple-300/80">
+                Automated backup schedules and delete locks are excluded by default on test databases. You can still take on-demand manual snapshots if desired before risky tests.
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Automated Backup Scheduler Card */}
       <div className="p-5 rounded-2xl bg-zinc-900/40 border border-zinc-800/80 space-y-5">

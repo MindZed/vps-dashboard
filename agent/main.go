@@ -157,7 +157,7 @@ func main() {
 		log.Println("[INFO] PostgreSQL not configured. MindZed Agent running in vitals-only mode (whitelist stored in JSON).")
 	}
 
-	dbManager := handler.NewDBManager(pool)
+	dbManager := handler.NewDBManager(pool, pgConnString)
 	explorerManager := handler.NewExplorerManager(pgConnString)
 	backupManager := handler.NewBackupManager(pool, pgConnString)
 
@@ -233,9 +233,10 @@ func main() {
 		v1.GET("/system/vitals", handler.GetSystemVitalsHandler)
 		v1.GET("/system/network/ports", handler.GetNetworkPortsHandler)
 
-		// Neon-style Database Provisioning
+		// Neon-style Database Provisioning & Cloning
 		v1.GET("/databases", dbManager.ListDatabases)
 		v1.POST("/databases", dbManager.CreateDatabase)
+		v1.POST("/databases/clone", dbManager.CloneDatabase)
 		v1.DELETE("/databases/:name", dbManager.DeleteDatabase)
 		v1.POST("/databases/:name/reset-password", dbManager.ResetDatabasePassword)
 

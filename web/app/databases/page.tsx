@@ -14,7 +14,8 @@ import {
   HardDrive, 
   AlertTriangle, 
   RefreshCw,
-  CheckCircle2
+  CheckCircle2,
+  FlaskConical
 } from "lucide-react";
 import { 
   fetchDatabases, 
@@ -25,6 +26,7 @@ import {
 } from "@/lib/agent-client";
 import CreateDbModal from "@/components/db/CreateDbModal";
 import ConnectionCard from "@/components/db/ConnectionCard";
+import CloneTestModal from "@/components/db/CloneTestModal";
 
 export default function DatabasesPage() {
   const [databases, setDatabases] = useState<DatabaseSummary[]>([]);
@@ -34,6 +36,7 @@ export default function DatabasesPage() {
   const [envFilter, setEnvFilter] = useState<string>("all");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [connectionModalData, setConnectionModalData] = useState<CreateDatabaseResponse | null>(null);
+  const [dbToClone, setDbToClone] = useState<DatabaseSummary | null>(null);
 
   // Safe 2-step delete state
   const [dbToDelete, setDbToDelete] = useState<string | null>(null);
@@ -266,6 +269,7 @@ export default function DatabasesPage() {
             { id: "prod", label: "PROD", activeClass: "bg-emerald-500/20 text-emerald-300 border-emerald-500/40" },
             { id: "staging", label: "STAGING", activeClass: "bg-amber-500/20 text-amber-300 border-amber-500/40" },
             { id: "dev", label: "DEV", activeClass: "bg-sky-500/20 text-sky-300 border-sky-500/40" },
+            { id: "test", label: "TEST", activeClass: "bg-purple-500/20 text-purple-300 border-purple-500/40" },
           ].map((item) => {
             const isActive = envFilter === item.id;
             return (
@@ -328,6 +332,7 @@ export default function DatabasesPage() {
                   const isProd = db.environment.toLowerCase() === "prod" || db.environment.toLowerCase() === "production";
                   const isStaging = db.environment.toLowerCase() === "staging";
                   const isDev = db.environment.toLowerCase() === "dev" || db.environment.toLowerCase() === "development";
+                  const isTest = db.environment.toLowerCase() === "test";
 
                   return (
                     <motion.tr
@@ -335,13 +340,17 @@ export default function DatabasesPage() {
                       initial={{ opacity: 0, y: 5 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.15, delay: idx * 0.02 }}
-                      className="hover:bg-zinc-850/30 transition-colors group"
+                      className="hover:bg-zinc-855/40 transition-colors group"
                     >
                       {/* Database Name */}
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-2.5">
-                          <div className="p-1.5 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 group-hover:border-zinc-500 transition-colors">
-                            <Database className="h-3.5 w-3.5" />
+                          <div className={`p-1.5 rounded-lg border transition-colors ${
+                            isTest
+                              ? "bg-purple-500/10 border-purple-500/30 text-purple-400"
+                              : "bg-zinc-800 border-zinc-700 text-zinc-300 group-hover:border-zinc-500"
+                          }`}>
+                            {isTest ? <FlaskConical className="h-3.5 w-3.5" /> : <Database className="h-3.5 w-3.5" />}
                           </div>
                           <div>
                             <span className="font-semibold text-white text-xs block">{db.name}</span>
@@ -352,16 +361,19 @@ export default function DatabasesPage() {
 
                       {/* Environment Badge (Soft Indicator Colors) */}
                       <td className="px-5 py-3.5">
-                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider border ${
+                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider border inline-flex items-center gap-1 ${
                           isProd
                             ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
                             : isStaging
                             ? "bg-amber-500/10 border-amber-500/30 text-amber-400"
                             : isDev
                             ? "bg-sky-500/10 border-sky-500/30 text-sky-400"
+                            : isTest
+                            ? "bg-purple-500/10 border-purple-500/30 text-purple-300"
                             : "bg-zinc-800 border-zinc-700 text-zinc-300"
                         }`}>
-                          {db.environment}
+                          <span>{db.environment}</span>
+                          {isTest && <span className="text-[8px] opacity-70 font-normal lowercase">(temp)</span>}
                         </span>
                       </td>
 
@@ -371,7 +383,7 @@ export default function DatabasesPage() {
                           <span>{db.size_mb} MB</span>
                           <div className="w-16 bg-zinc-800 rounded-full h-1 overflow-hidden">
                             <div
-                              className="bg-white h-full rounded-full"
+                              className={`h-full rounded-full ${isTest ? "bg-purple-400" : "bg-white"}`}
                               style={{ width: `${Math.min(100, Math.max(10, db.size_mb * 2))}%` }}
                             />
                           </div>
@@ -407,19 +419,29 @@ export default function DatabasesPage() {
                             <span>Studio</span>
                           </Link>
 
+                          {/* 1-Click Clone to Test Action */}
+                          <button
+                            onClick={() => setDbToClone(db)}
+                            className="px-2.5 py-1 rounded-lg text-xs font-sans font-medium text-purple-300 hover:text-purple-200 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 transition-colors flex items-center gap-1.5 cursor-pointer shadow-sm"
+                            title="Create an isolated testing clone of this database"
+                          >
+                            <FlaskConical className="h-3 w-3" />
+                            <span className="hidden sm:inline">Clone to Test</span>
+                          </button>
+
                           <button
                             onClick={() => handleOpenExistingConnection(db)}
                             className="px-2.5 py-1 rounded-lg text-xs font-sans font-medium text-zinc-200 hover:text-white bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 transition-colors flex items-center gap-1.5 cursor-pointer"
                             title="View connection URLs & credentials"
                           >
                             <KeyRound className="h-3 w-3" />
-                            <span>Connection Info</span>
+                            <span className="hidden sm:inline">Connection Info</span>
                           </button>
 
                           <button
                             onClick={() => setDbToDelete(db.name)}
                             className="p-1.5 rounded-lg text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
-                            title="Drop database"
+                            title={isTest ? "Drop ephemeral test database" : "Drop database"}
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -441,6 +463,17 @@ export default function DatabasesPage() {
         onCreated={handleDatabaseCreated}
       />
 
+      <CloneTestModal
+        isOpen={!!dbToClone}
+        sourceDb={dbToClone}
+        onClose={() => setDbToClone(null)}
+        onCloned={(clonedDb) => {
+          setConnectionModalData(clonedDb);
+          showToast(`Database ${clonedDb.database} cloned successfully!`);
+          loadDatabases();
+        }}
+      />
+
       {connectionModalData && (
         <ConnectionCard
           data={connectionModalData}
@@ -448,7 +481,7 @@ export default function DatabasesPage() {
         />
       )}
 
-      {/* Safe 2-Step Delete Confirmation Dialog (Soft Rose Alert) */}
+      {/* Safe Delete Confirmation Dialog (Soft Rose Alert) */}
       {dbToDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl bg-[#111114] border border-rose-900/40 p-6 shadow-2xl space-y-4">
@@ -457,14 +490,21 @@ export default function DatabasesPage() {
                 <AlertTriangle className="h-5 w-5" />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-white">Drop Database</h3>
-                <p className="text-xs text-zinc-400">This action cannot be undone.</p>
+                <h3 className="text-sm font-semibold text-white">
+                  {dbToDelete.includes("_test") ? "Drop Ephemeral Test Database" : "Drop Database"}
+                </h3>
+                <p className="text-xs text-zinc-400">
+                  {dbToDelete.includes("_test") ? "Temporary sandbox will be immediately released" : "This action cannot be undone."}
+                </p>
               </div>
             </div>
 
             <p className="text-xs text-zinc-300 leading-relaxed">
               Are you sure you want to drop <span className="font-mono font-bold text-rose-300">{dbToDelete}</span>? 
-              All active connections will be terminated via <code className="text-white">pg_terminate_backend</code> and data will be permanently removed.
+              {dbToDelete.includes("_test") 
+                ? " This temporary database was created for testing. Active connections will be dropped and all data will be purged."
+                : " All active connections will be terminated via pg_terminate_backend and data will be permanently removed."
+              }
             </p>
 
             {deleteError && (
@@ -488,7 +528,7 @@ export default function DatabasesPage() {
                 disabled={isDeleting}
                 className="px-4 py-2 rounded-xl text-xs font-semibold text-white bg-rose-600/90 hover:bg-rose-500 disabled:opacity-50 transition-colors flex items-center gap-1.5 cursor-pointer shadow"
               >
-                {isDeleting ? "Dropping..." : "Confirm Drop"}
+                {isDeleting ? "Dropping..." : dbToDelete.includes("_test") ? "Confirm Drop Test DB" : "Confirm Drop"}
               </button>
             </div>
           </div>

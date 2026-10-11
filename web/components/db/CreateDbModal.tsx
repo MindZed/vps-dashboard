@@ -13,7 +13,7 @@ interface CreateDbModalProps {
 
 export default function CreateDbModal({ isOpen, onClose, onCreated }: CreateDbModalProps) {
   const [projectName, setProjectName] = useState("");
-  const [environment, setEnvironment] = useState<"prod" | "staging" | "dev">("prod");
+  const [environment, setEnvironment] = useState<"prod" | "staging" | "dev" | "test">("prod");
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
@@ -62,6 +62,7 @@ export default function CreateDbModal({ isOpen, onClose, onCreated }: CreateDbMo
     { id: "prod", label: "Production", activeClass: "border-emerald-500/40 bg-emerald-500/10 text-emerald-300" },
     { id: "staging", label: "Staging", activeClass: "border-amber-500/40 bg-amber-500/10 text-amber-300" },
     { id: "dev", label: "Development", activeClass: "border-sky-500/40 bg-sky-500/10 text-sky-300" },
+    { id: "test", label: "Test / Ephemeral", activeClass: "border-purple-500/40 bg-purple-500/10 text-purple-300" },
   ] as const;
 
   return (
@@ -166,7 +167,7 @@ export default function CreateDbModal({ isOpen, onClose, onCreated }: CreateDbMo
                   <label className="block text-xs font-semibold text-zinc-300 mb-1.5">
                     ENVIRONMENT
                   </label>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {environments.map((env) => {
                       const isSelected = environment === env.id;
                       return (
