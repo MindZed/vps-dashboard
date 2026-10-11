@@ -46,6 +46,17 @@ type Incident struct {
 	DurationSec int     `json:"duration_sec"`
 }
 
+type UptimeBucket struct {
+	TimeLabel     string  `json:"time_label"`     // e.g. "Oct 11" or "15:00"
+	DateKey       string  `json:"date_key"`       // "2026-10-11" or "2026-10-11 15:00"
+	UptimePercent float64 `json:"uptime_percent"` // 0.0 - 100.0
+	AvgLatencyMs  int64   `json:"avg_latency_ms"`
+	TotalChecks   int     `json:"total_checks"`
+	UpChecks      int     `json:"up_checks"`
+	DownChecks    int     `json:"down_checks"`
+	Status        string  `json:"status"` // "up", "degraded", "down", "no_data"
+}
+
 type Store struct {
 	db *sql.DB
 	mu sync.RWMutex
@@ -229,6 +240,20 @@ func (s *Store) ToggleMonitor(id string, active bool) error {
 	return err
 }
 
+func (s *Store) UpdateMonitor(id, name, url, probeType string, interval int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if interval <= 0 {
+		interval = 30
+	}
+	_, err := s.db.Exec(
+		"UPDATE monitors SET name = ?, url = ?, type = ?, interval_sec = ? WHERE id = ?",
+		name, url, probeType, interval, id,
+	)
+	return err
+}
+
 func (s *Store) RecordHeartbeat(monitorID string, status int, latencyMs int64, statusCode int, errMsg string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -285,6 +310,216 @@ func (s *Store) CalculateUptime(monitorID string, hours int) float64 {
 	}
 	return float64(up) / float64(total) * 100.0
 }
+
+func (s *Store) GetDailyBuckets(monitorID string, days int) ([]UptimeBucket, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if days <= 0 {
+		days = 30
+	}
+
+	query := fmt.Sprintf(`
+		SELECT 
+			date(created_at) as day,
+			COUNT(*) as total_checks,
+			COALESCE(SUM(CASE WHEN status = 1 THEN 1 ELSE 0 END), 0) as up_checks,
+			COALESCE(SUM(CASE WHEN status = 0 THEN 1 ELSE 0 END), 0) as down_checks,
+			COALESCE(AVG(latency_ms), 0) as avg_latency
+		FROM heartbeats 
+		WHERE monitor_id = ? AND created_at >= datetime('now', '-%d days')
+		GROUP BY date(created_at)
+	`, days)
+
+	rows, err := s.db.Query(query, monitorID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	type dayData struct {
+		total   int
+		up      int
+		down    int
+		latency int64
+	}
+	dataMap := make(map[string]dayData)
+
+	for rows.Next() {
+		var day string
+		var total, up, down int
+		var latency float64
+		if err := rows.Scan(&day, &total, &up, &down, &latency); err == nil {
+			dataMap[day] = dayData{
+				total:   total,
+				up:      up,
+				down:    down,
+				latency: int64(latency),
+			}
+		}
+	}
+
+	now := time.Now().UTC()
+	buckets := make([]UptimeBucket, days)
+	for i := 0; i < days; i++ {
+		d := now.AddDate(0, 0, -(days - 1 - i))
+		dayKey := d.Format("2006-01-02")
+		label := d.Format("Jan 02")
+
+		if dInfo, ok := dataMap[dayKey]; ok && dInfo.total > 0 {
+			uptime := float64(dInfo.up) / float64(dInfo.total) * 100.0
+			uptime = float64(int(uptime*100)) / 100.0
+
+			status := "up"
+			if uptime < 90.0 {
+				status = "down"
+			} else if uptime < 99.0 {
+				status = "degraded"
+			}
+
+			buckets[i] = UptimeBucket{
+				TimeLabel:     label,
+				DateKey:       dayKey,
+				UptimePercent: uptime,
+				AvgLatencyMs:  dInfo.latency,
+				TotalChecks:   dInfo.total,
+				UpChecks:      dInfo.up,
+				DownChecks:    dInfo.down,
+				Status:        status,
+			}
+		} else {
+			buckets[i] = UptimeBucket{
+				TimeLabel:     label,
+				DateKey:       dayKey,
+				UptimePercent: 100.0,
+				AvgLatencyMs:  0,
+				TotalChecks:   0,
+				UpChecks:      0,
+				DownChecks:    0,
+				Status:        "no_data",
+			}
+		}
+	}
+
+	return buckets, nil
+}
+
+func (s *Store) GetHourlyBuckets(monitorID string, hours int) ([]UptimeBucket, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if hours <= 0 {
+		hours = 24
+	}
+
+	query := fmt.Sprintf(`
+		SELECT 
+			strftime('%%Y-%%m-%%d %%H:00', created_at) as hour_key,
+			COUNT(*) as total_checks,
+			COALESCE(SUM(CASE WHEN status = 1 THEN 1 ELSE 0 END), 0) as up_checks,
+			COALESCE(SUM(CASE WHEN status = 0 THEN 1 ELSE 0 END), 0) as down_checks,
+			COALESCE(AVG(latency_ms), 0) as avg_latency
+		FROM heartbeats 
+		WHERE monitor_id = ? AND created_at >= datetime('now', '-%d hours')
+		GROUP BY strftime('%%Y-%%m-%%d %%H:00', created_at)
+	`, hours)
+
+	rows, err := s.db.Query(query, monitorID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	type hourData struct {
+		total   int
+		up      int
+		down    int
+		latency int64
+	}
+	dataMap := make(map[string]hourData)
+
+	for rows.Next() {
+		var hKey string
+		var total, up, down int
+		var latency float64
+		if err := rows.Scan(&hKey, &total, &up, &down, &latency); err == nil {
+			dataMap[hKey] = hourData{
+				total:   total,
+				up:      up,
+				down:    down,
+				latency: int64(latency),
+			}
+		}
+	}
+
+	now := time.Now().UTC()
+	buckets := make([]UptimeBucket, hours)
+	for i := 0; i < hours; i++ {
+		t := now.Add(-time.Duration(hours-1-i) * time.Hour)
+		hourKey := t.Format("2006-01-02 15:00")
+		label := t.Format("15:00")
+
+		if hInfo, ok := dataMap[hourKey]; ok && hInfo.total > 0 {
+			uptime := float64(hInfo.up) / float64(hInfo.total) * 100.0
+			uptime = float64(int(uptime*100)) / 100.0
+
+			status := "up"
+			if uptime < 90.0 {
+				status = "down"
+			} else if uptime < 99.0 {
+				status = "degraded"
+			}
+
+			buckets[i] = UptimeBucket{
+				TimeLabel:     label,
+				DateKey:       hourKey,
+				UptimePercent: uptime,
+				AvgLatencyMs:  hInfo.latency,
+				TotalChecks:   hInfo.total,
+				UpChecks:      hInfo.up,
+				DownChecks:    hInfo.down,
+				Status:        status,
+			}
+		} else {
+			buckets[i] = UptimeBucket{
+				TimeLabel:     label,
+				DateKey:       hourKey,
+				UptimePercent: 100.0,
+				AvgLatencyMs:  0,
+				TotalChecks:   0,
+				UpChecks:      0,
+				DownChecks:    0,
+				Status:        "no_data",
+			}
+		}
+	}
+
+	return buckets, nil
+}
+
+func (s *Store) GetMonitorStats(monitorID string, hours int) (minPing, maxPing, avgPing int64) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if hours <= 0 {
+		hours = 24
+	}
+
+	query := fmt.Sprintf(`
+		SELECT 
+			COALESCE(MIN(latency_ms), 0),
+			COALESCE(MAX(latency_ms), 0),
+			COALESCE(AVG(latency_ms), 0)
+		FROM heartbeats 
+		WHERE monitor_id = ? AND status = 1 AND created_at >= datetime('now', '-%d hours')
+	`, hours)
+
+	var min, max int64
+	var avg float64
+	_ = s.db.QueryRow(query, monitorID).Scan(&min, &max, &avg)
+	return min, max, int64(avg)
+}
+
 
 func (s *Store) RecordIncident(monitorID, monitorName, title, impact, errMsg string) (string, error) {
 	s.mu.Lock()

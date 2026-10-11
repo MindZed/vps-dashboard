@@ -103,6 +103,7 @@ func main() {
 		// Monitors CRUD
 		v1.GET("/monitors", apiHandler.ListMonitorsHandler)
 		v1.POST("/monitors", apiHandler.AddMonitorHandler)
+		v1.PUT("/monitors/:id", apiHandler.UpdateMonitorHandler)
 		v1.DELETE("/monitors/:id", apiHandler.DeleteMonitorHandler)
 		v1.PATCH("/monitors/:id/toggle", apiHandler.ToggleMonitorHandler)
 	}
@@ -144,22 +145,38 @@ func main() {
 }
 
 func startScheduler(store *storage.Store, stop <-chan struct{}) {
-	ticker := time.NewTicker(30 * time.Second)
+	// Master scheduler ticks every 5 seconds to evaluate monitor interval triggers
+	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
 	// Track active incidents per monitor in-memory
 	activeIncidentMap := make(map[string]bool)
+	// Track last probe time per monitor
+	lastProbeMap := make(map[string]time.Time)
 
-	probeFleet := func() {
+	checkAndProbe := func() {
 		monitors, err := store.ListMonitors()
 		if err != nil {
 			return
 		}
 
+		now := time.Now()
 		for _, m := range monitors {
 			if !m.Active {
 				continue
 			}
+
+			interval := m.IntervalSec
+			if interval <= 0 {
+				interval = 30
+			}
+
+			lastTime, exists := lastProbeMap[m.ID]
+			if exists && now.Sub(lastTime) < time.Duration(interval)*time.Second {
+				continue
+			}
+
+			lastProbeMap[m.ID] = now
 
 			// Probe concurrently per monitor
 			go func(mon storage.Monitor) {
@@ -194,15 +211,16 @@ func startScheduler(store *storage.Store, stop <-chan struct{}) {
 		}
 	}
 
-	// Initial immediate probe on startup
-	probeFleet()
+	// Initial immediate check on startup
+	checkAndProbe()
 
 	for {
 		select {
 		case <-ticker.C:
-			probeFleet()
+			checkAndProbe()
 		case <-stop:
 			return
 		}
 	}
 }
+

@@ -32,18 +32,36 @@ export interface SentinelHeartbeat {
   created_at: string;
 }
 
+export interface UptimeBucket {
+  time_label: string;
+  date_key: string;
+  uptime_percent: number;
+  avg_latency_ms: number;
+  total_checks: number;
+  up_checks: number;
+  down_checks: number;
+  status: "up" | "degraded" | "down" | "no_data";
+}
+
 export interface SentinelMonitor {
   id: string;
   name: string;
   url: string;
   type: string; // "HTTPS" | "TCP"
+  interval_sec: number;
   status: "up" | "down" | "degraded";
   current_ping: number;
+  min_ping?: number;
+  max_ping?: number;
+  avg_ping?: number;
   uptime24h: number;
   uptime30d: number;
   ssl_days_left?: number;
   ssl_issuer?: string;
   heartbeats: SentinelHeartbeat[];
+  buckets_24h?: UptimeBucket[];
+  buckets_7d?: UptimeBucket[];
+  buckets_30d?: UptimeBucket[];
   last_checked_at: string;
   active: boolean;
 }
@@ -118,19 +136,59 @@ export async function fetchWatchdogStatus(): Promise<SentinelStatusResponse> {
     });
   };
 
+  const generateMockDailyBuckets = (days: number, basePing: number): UptimeBucket[] => {
+    return Array.from({ length: days }).map((_, i) => {
+      const d = new Date(now - (days - 1 - i) * 86400000);
+      const isPastFailure = i === days - 4 && basePing < 10;
+      return {
+        time_label: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+        date_key: d.toISOString().split("T")[0],
+        uptime_percent: isPastFailure ? 98.4 : 100.0,
+        avg_latency_ms: Math.round(basePing + Math.sin(i) * 3),
+        total_checks: 1440,
+        up_checks: isPastFailure ? 1417 : 1440,
+        down_checks: isPastFailure ? 23 : 0,
+        status: isPastFailure ? "degraded" : "up",
+      };
+    });
+  };
+
+  const generateMockHourlyBuckets = (hours: number, basePing: number): UptimeBucket[] => {
+    return Array.from({ length: hours }).map((_, i) => {
+      const d = new Date(now - (hours - 1 - i) * 3600000);
+      return {
+        time_label: `${String(d.getHours()).padStart(2, "0")}:00`,
+        date_key: `${d.toISOString().split("T")[0]} ${String(d.getHours()).padStart(2, "0")}:00`,
+        uptime_percent: 100.0,
+        avg_latency_ms: Math.round(basePing + (i % 3)),
+        total_checks: 120,
+        up_checks: 120,
+        down_checks: 0,
+        status: "up",
+      };
+    });
+  };
+
   const mockMonitors: SentinelMonitor[] = [
     {
       id: "mon_agent",
       name: "Go VPS Agent (Cloudflare Tunnel)",
       url: "https://agent.mindzed.tech/health",
       type: "HTTPS",
+      interval_sec: 30,
       status: "up",
       current_ping: 24,
+      min_ping: 18,
+      max_ping: 42,
+      avg_ping: 25,
       uptime24h: 100.0,
       uptime30d: 99.98,
       ssl_days_left: 78,
       ssl_issuer: "Google Trust Services LLC",
       heartbeats: generateMockHbs(24),
+      buckets_24h: generateMockHourlyBuckets(24, 24),
+      buckets_7d: generateMockDailyBuckets(7, 24),
+      buckets_30d: generateMockDailyBuckets(30, 24),
       last_checked_at: new Date().toISOString(),
       active: true,
     },
@@ -139,13 +197,20 @@ export async function fetchWatchdogStatus(): Promise<SentinelStatusResponse> {
       name: "Dokploy PaaS Manager",
       url: "https://dokploy.mindzed.tech",
       type: "HTTPS",
+      interval_sec: 30,
       status: "up",
       current_ping: 32,
+      min_ping: 28,
+      max_ping: 58,
+      avg_ping: 34,
       uptime24h: 100.0,
       uptime30d: 99.99,
       ssl_days_left: 64,
       ssl_issuer: "Let's Encrypt",
       heartbeats: generateMockHbs(32),
+      buckets_24h: generateMockHourlyBuckets(24, 32),
+      buckets_7d: generateMockDailyBuckets(7, 32),
+      buckets_30d: generateMockDailyBuckets(30, 32),
       last_checked_at: new Date().toISOString(),
       active: true,
     },
@@ -154,11 +219,18 @@ export async function fetchWatchdogStatus(): Promise<SentinelStatusResponse> {
       name: "PgBouncer Connection Pooler",
       url: "129.154.34.1:6432",
       type: "TCP",
+      interval_sec: 10,
       status: "up",
       current_ping: 2,
+      min_ping: 1,
+      max_ping: 5,
+      avg_ping: 2,
       uptime24h: 99.95,
       uptime30d: 99.92,
       heartbeats: generateMockHbs(2, true),
+      buckets_24h: generateMockHourlyBuckets(24, 2),
+      buckets_7d: generateMockDailyBuckets(7, 2),
+      buckets_30d: generateMockDailyBuckets(30, 2),
       last_checked_at: new Date().toISOString(),
       active: true,
     },
@@ -167,13 +239,20 @@ export async function fetchWatchdogStatus(): Promise<SentinelStatusResponse> {
       name: "MindZed Primary Portal",
       url: "https://mindzed.tech",
       type: "HTTPS",
+      interval_sec: 30,
       status: "up",
       current_ping: 18,
+      min_ping: 14,
+      max_ping: 35,
+      avg_ping: 19,
       uptime24h: 100.0,
       uptime30d: 99.99,
       ssl_days_left: 36,
       ssl_issuer: "YR1",
       heartbeats: generateMockHbs(18),
+      buckets_24h: generateMockHourlyBuckets(24, 18),
+      buckets_7d: generateMockDailyBuckets(7, 18),
+      buckets_30d: generateMockDailyBuckets(30, 18),
       last_checked_at: new Date().toISOString(),
       active: true,
     },
@@ -238,7 +317,7 @@ export async function probeTarget(target: string, type = "HTTPS"): Promise<Synth
   };
 }
 
-export async function addWatchdogMonitor(name: string, url: string, type = "HTTPS", intervalSec = 60) {
+export async function addWatchdogMonitor(name: string, url: string, type = "HTTPS", intervalSec = 30) {
   try {
     const res = await fetch(getWatchdogEndpoint("monitors"), {
       method: "POST",
@@ -250,6 +329,20 @@ export async function addWatchdogMonitor(name: string, url: string, type = "HTTP
     return { error: "Failed to add monitor" };
   }
 }
+
+export async function updateWatchdogMonitor(id: string, data: { name: string; url: string; type: string; interval_sec: number }) {
+  try {
+    const res = await fetch(getWatchdogEndpoint(`monitors/${encodeURIComponent(id)}`), {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    return await res.json();
+  } catch (e) {
+    return { error: "Failed to update monitor" };
+  }
+}
+
 
 export async function deleteWatchdogMonitor(id: string) {
   try {

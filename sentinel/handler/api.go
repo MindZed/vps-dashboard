@@ -60,19 +60,26 @@ func (h *APIHandler) GetStatusHandler(c *gin.Context) {
 	}
 
 	type MonitorStatus struct {
-		ID            string              `json:"id"`
-		Name          string              `json:"name"`
-		URL           string              `json:"url"`
-		Type          string              `json:"type"`
-		Status        string              `json:"status"` // "up", "down", "degraded"
-		CurrentPing   int64               `json:"current_ping"`
-		Uptime24h     float64             `json:"uptime24h"`
-		Uptime30d     float64             `json:"uptime30d"`
-		SSLDaysLeft   *int                `json:"ssl_days_left,omitempty"`
-		SSLIssuer     *string             `json:"ssl_issuer,omitempty"`
-		Heartbeats    []storage.Heartbeat `json:"heartbeats"`
-		LastCheckedAt string              `json:"last_checked_at"`
-		Active        bool                `json:"active"`
+		ID            string                 `json:"id"`
+		Name          string                 `json:"name"`
+		URL           string                 `json:"url"`
+		Type          string                 `json:"type"`
+		IntervalSec   int                    `json:"interval_sec"`
+		Status        string                 `json:"status"` // "up", "down", "degraded"
+		CurrentPing   int64                  `json:"current_ping"`
+		MinPing       int64                  `json:"min_ping"`
+		MaxPing       int64                  `json:"max_ping"`
+		AvgPing       int64                  `json:"avg_ping"`
+		Uptime24h     float64                `json:"uptime24h"`
+		Uptime30d     float64                `json:"uptime30d"`
+		SSLDaysLeft   *int                   `json:"ssl_days_left,omitempty"`
+		SSLIssuer     *string                `json:"ssl_issuer,omitempty"`
+		Heartbeats    []storage.Heartbeat    `json:"heartbeats"`
+		Buckets24h    []storage.UptimeBucket `json:"buckets_24h"`
+		Buckets7d     []storage.UptimeBucket `json:"buckets_7d"`
+		Buckets30d    []storage.UptimeBucket `json:"buckets_30d"`
+		LastCheckedAt string                 `json:"last_checked_at"`
+		Active        bool                   `json:"active"`
 	}
 
 	var statusList []MonitorStatus
@@ -83,6 +90,11 @@ func (h *APIHandler) GetStatusHandler(c *gin.Context) {
 		up24 := h.Store.CalculateUptime(m.ID, 24)
 		up720 := h.Store.CalculateUptime(m.ID, 720)
 		totalUptimeSum += up720
+
+		minP, maxP, avgP := h.Store.GetMonitorStats(m.ID, 24)
+		b24, _ := h.Store.GetHourlyBuckets(m.ID, 24)
+		b7, _ := h.Store.GetDailyBuckets(m.ID, 7)
+		b30, _ := h.Store.GetDailyBuckets(m.ID, 30)
 
 		status := "up"
 		var currentPing int64 = 0
@@ -99,16 +111,28 @@ func (h *APIHandler) GetStatusHandler(c *gin.Context) {
 			}
 		}
 
+		interval := m.IntervalSec
+		if interval <= 0 {
+			interval = 30
+		}
+
 		ms := MonitorStatus{
 			ID:            m.ID,
 			Name:          m.Name,
 			URL:           m.URL,
 			Type:          m.Type,
+			IntervalSec:   interval,
 			Status:        status,
 			CurrentPing:   currentPing,
+			MinPing:       minP,
+			MaxPing:       maxP,
+			AvgPing:       avgP,
 			Uptime24h:     float64(int(up24*100)) / 100,
 			Uptime30d:     float64(int(up720*100)) / 100,
 			Heartbeats:    hbs,
+			Buckets24h:    b24,
+			Buckets7d:     b7,
+			Buckets30d:    b30,
 			LastCheckedAt: lastChecked,
 			Active:        m.Active,
 		}
@@ -176,6 +200,43 @@ func (h *APIHandler) AddMonitorHandler(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, m)
+}
+
+// UpdateMonitorHandler edits an existing monitor's configuration including tick interval
+func (h *APIHandler) UpdateMonitorHandler(c *gin.Context) {
+	id := c.Param("id")
+	var body struct {
+		Name        string `json:"name" binding:"required"`
+		URL         string `json:"url" binding:"required"`
+		Type        string `json:"type"`
+		IntervalSec int    `json:"interval_sec"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "name and url are required"})
+		return
+	}
+
+	probeType := strings.ToUpper(strings.TrimSpace(body.Type))
+	if probeType == "" {
+		probeType = "HTTPS"
+	}
+
+	interval := body.IntervalSec
+	if interval <= 0 {
+		interval = 30
+	}
+
+	if err := h.Store.UpdateMonitor(id, body.Name, body.URL, probeType, interval); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to update monitor: %v", err)})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success":      true,
+		"message":      "Monitor updated successfully",
+		"id":           id,
+		"interval_sec": interval,
+	})
 }
 
 // DeleteMonitorHandler removes a monitor
