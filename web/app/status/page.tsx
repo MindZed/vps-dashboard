@@ -236,9 +236,9 @@ export default function StatusPage() {
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-300 pb-16">
+    <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 sm:space-y-8 animate-in fade-in duration-200">
       {/* Header Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800 pb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800 pb-4 sm:pb-6">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white flex items-center gap-2.5">
@@ -279,8 +279,8 @@ export default function StatusPage() {
       </div>
 
       {/* Instant Synthetic Site Inspector */}
-      <div className="rounded-2xl bg-zinc-900/40 border border-zinc-800/80 p-5 backdrop-blur-sm space-y-4 shadow-lg">
-        <div className="flex items-center justify-between">
+      <div className="rounded-2xl bg-zinc-900/40 border border-zinc-800/80 p-4 sm:p-5 backdrop-blur-sm space-y-4 shadow-lg">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
           <div className="flex items-center gap-2">
             <Globe className="h-4 w-4 text-sky-400" />
             <h2 className="text-sm font-semibold text-white">Instant Synthetic Site Inspector</h2>
@@ -307,7 +307,7 @@ export default function StatusPage() {
           <button
             onClick={() => handleProbeSite()}
             disabled={isProbing || !probeInput.trim()}
-            className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-black text-xs font-semibold font-mono transition-colors"
+            className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-black text-xs font-semibold font-mono transition-colors shrink-0"
           >
             {isProbing ? (
               <>
@@ -410,7 +410,7 @@ export default function StatusPage() {
       </div>
 
       {/* Main Overall Fleet Availability Card */}
-      <div className="rounded-2xl bg-zinc-900/30 border border-zinc-800 p-6 backdrop-blur-sm shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+      <div className="rounded-2xl bg-zinc-900/30 border border-zinc-800 p-4 sm:p-6 backdrop-blur-sm shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
         <div className="space-y-1">
           <span className="text-xs font-mono text-zinc-400 uppercase tracking-wider block">
             AVERAGE FLEET AVAILABILITY (30 DAYS)
@@ -423,14 +423,14 @@ export default function StatusPage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 w-full md:w-auto text-xs font-mono">
-          <div className="rounded-xl bg-zinc-950 p-3.5 border border-zinc-800">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 w-full md:w-auto text-xs font-mono">
+          <div className="rounded-xl bg-zinc-950 p-3 sm:p-3.5 border border-zinc-800">
             <span className="text-[10px] text-zinc-500 block">MONITORED TARGETS</span>
-            <span className="text-lg font-bold text-white">{data?.monitors.length ?? 4} Services</span>
+            <span className="text-base sm:text-lg font-bold text-white">{data?.monitors.length ?? 4} Services</span>
           </div>
-          <div className="rounded-xl bg-zinc-950 p-3.5 border border-zinc-800">
+          <div className="rounded-xl bg-zinc-950 p-3 sm:p-3.5 border border-zinc-800">
             <span className="text-[10px] text-zinc-500 block">MEMORY FOOTPRINT</span>
-            <span className="text-lg font-bold text-emerald-400">~12 MB RAM</span>
+            <span className="text-base sm:text-lg font-bold text-emerald-400">~12 MB RAM</span>
           </div>
         </div>
       </div>
@@ -444,10 +444,10 @@ export default function StatusPage() {
           </h2>
 
           {/* Time Horizon Selector (Industry Standard) */}
-          <div className="flex items-center gap-1 bg-zinc-950 p-1 rounded-xl border border-zinc-800 text-xs font-mono self-start sm:self-auto">
+          <div className="flex items-center gap-1 bg-zinc-950 p-1 rounded-xl border border-zinc-800 text-xs font-mono overflow-x-auto max-w-full">
             <button
               onClick={() => setTimeWindow("30d")}
-              className={`px-3 py-1 rounded-lg transition-colors flex items-center gap-1.5 ${
+              className={`px-2.5 sm:px-3 py-1 rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap text-xs ${
                 timeWindow === "30d" ? "bg-white text-black font-semibold shadow-sm" : "text-zinc-400 hover:text-white"
               }`}
             >
@@ -456,7 +456,7 @@ export default function StatusPage() {
             </button>
             <button
               onClick={() => setTimeWindow("7d")}
-              className={`px-3 py-1 rounded-lg transition-colors flex items-center gap-1.5 ${
+              className={`px-2.5 sm:px-3 py-1 rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap text-xs ${
                 timeWindow === "7d" ? "bg-white text-black font-semibold shadow-sm" : "text-zinc-400 hover:text-white"
               }`}
             >
@@ -464,7 +464,7 @@ export default function StatusPage() {
             </button>
             <button
               onClick={() => setTimeWindow("24h")}
-              className={`px-3 py-1 rounded-lg transition-colors flex items-center gap-1.5 ${
+              className={`px-2.5 sm:px-3 py-1 rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap text-xs ${
                 timeWindow === "24h" ? "bg-white text-black font-semibold shadow-sm" : "text-zinc-400 hover:text-white"
               }`}
             >
@@ -473,7 +473,7 @@ export default function StatusPage() {
             </button>
             <button
               onClick={() => setTimeWindow("ticks")}
-              className={`px-3 py-1 rounded-lg transition-colors flex items-center gap-1.5 ${
+              className={`px-2.5 sm:px-3 py-1 rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap text-xs ${
                 timeWindow === "ticks" ? "bg-white text-black font-semibold shadow-sm" : "text-zinc-400 hover:text-white"
               }`}
             >
@@ -519,52 +519,88 @@ export default function StatusPage() {
             return (
               <div
                 key={mon.id}
-                className={`rounded-2xl border p-5 backdrop-blur-sm space-y-4 transition-all ${
+                className={`rounded-2xl border p-4 sm:p-5 backdrop-blur-sm space-y-3 sm:space-y-4 transition-all ${
                   mon.active
                     ? "bg-zinc-900/30 border-zinc-800/80 hover:border-zinc-700"
                     : "bg-zinc-950/40 border-zinc-850 opacity-60"
                 }`}
               >
-                {/* Service Header */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2.5 rounded-xl border ${
-                      mon.status === "up"
-                        ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-400"
-                        : "bg-rose-500/10 border-rose-500/25 text-rose-400"
-                    }`}>
-                      <Server className="h-4 w-4" />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-                        {mon.name}
-                        <span className="text-[10px] font-mono px-2 py-0.2 rounded bg-zinc-800 text-zinc-300">
-                          {mon.type}
-                        </span>
-                        <span className="text-[10px] font-mono px-2 py-0.2 rounded bg-sky-500/10 border border-sky-500/20 text-sky-400 flex items-center gap-1" title="Configured probe frequency">
-                          <Zap className="h-2.5 w-2.5" />
-                          <span>{formatIntervalLabel(mon.interval_sec)} tick</span>
-                        </span>
-                        {mon.ssl_days_left != null && (
-                          <span className="text-[10px] font-mono px-2 py-0.2 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center gap-1">
-                            <Lock className="h-2.5 w-2.5" /> {mon.ssl_days_left}d SSL
+                {/* Service Header Row */}
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                  <div className="flex items-start justify-between gap-3 min-w-0">
+                    <div className="flex items-start gap-3 min-w-0">
+                      <div className={`p-2.5 rounded-xl border shrink-0 mt-0.5 ${
+                        mon.status === "up"
+                          ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-400"
+                          : "bg-rose-500/10 border-rose-500/25 text-rose-400"
+                      }`}>
+                        <Server className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                          <h3 className="text-sm font-semibold text-white break-words">
+                            {mon.name}
+                          </h3>
+                          <span className="text-[10px] font-mono px-1.5 sm:px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 shrink-0">
+                            {mon.type}
                           </span>
-                        )}
-                      </h3>
-                      <a
-                        href={mon.url.startsWith("http") ? mon.url : undefined}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-xs text-zinc-500 font-mono hover:text-white transition-colors flex items-center gap-1"
+                          <span className="text-[10px] font-mono px-1.5 sm:px-2 py-0.5 rounded bg-sky-500/10 border border-sky-500/20 text-sky-400 flex items-center gap-1 shrink-0" title="Configured probe frequency">
+                            <Zap className="h-2.5 w-2.5" />
+                            <span>{formatIntervalLabel(mon.interval_sec)} tick</span>
+                          </span>
+                          {mon.ssl_days_left != null && (
+                            <span className="text-[10px] font-mono px-1.5 sm:px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center gap-1 shrink-0">
+                              <Lock className="h-2.5 w-2.5" /> {mon.ssl_days_left}d SSL
+                            </span>
+                          )}
+                        </div>
+                        <a
+                          href={mon.url.startsWith("http") ? mon.url : undefined}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs text-zinc-500 font-mono hover:text-white transition-colors flex items-center gap-1 truncate mt-0.5 max-w-full"
+                        >
+                          <span className="truncate">{mon.url}</span>
+                          {mon.url.startsWith("http") && <ExternalLink className="h-2.5 w-2.5 shrink-0" />}
+                        </a>
+                      </div>
+                    </div>
+
+                    {/* Mobile/Tablet Top-Right Action Buttons */}
+                    <div className="flex items-center gap-1 shrink-0 lg:hidden">
+                      <button
+                        onClick={() => handleProbeSite(mon.url)}
+                        className="p-1.5 rounded-lg text-zinc-400 hover:text-emerald-400 hover:bg-zinc-800 transition-colors"
+                        title="Run on-demand synthetic probe"
                       >
-                        <span>{mon.url}</span>
-                        {mon.url.startsWith("http") && <ExternalLink className="h-2.5 w-2.5" />}
-                      </a>
+                        <Zap className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleOpenEdit(mon)}
+                        className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+                        title="Edit monitor settings"
+                      >
+                        <Settings className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleToggleMonitor(mon)}
+                        className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+                        title={mon.active ? "Pause monitor" : "Resume monitor"}
+                      >
+                        {mon.active ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5 text-emerald-400" />}
+                      </button>
+                      <button
+                        onClick={() => handleDeleteMonitor(mon.id)}
+                        className="p-1.5 rounded-lg text-zinc-400 hover:text-rose-400 hover:bg-rose-950/20 transition-colors"
+                        title="Delete monitor"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
                     </div>
                   </div>
 
-                  {/* Operational Telemetry Strip */}
-                  <div className="flex flex-wrap items-center gap-4 text-xs font-mono">
+                  {/* Desktop Inline Telemetry & Actions */}
+                  <div className="hidden lg:flex items-center gap-5 text-xs font-mono shrink-0">
                     <div className="text-right">
                       <span className="text-zinc-500 text-[10px] block">CURRENT</span>
                       <span className="text-emerald-400 font-semibold">{mon.current_ping} ms</span>
@@ -586,8 +622,8 @@ export default function StatusPage() {
                       </span>
                     </div>
 
-                    {/* Operational Action Buttons */}
-                    <div className="flex items-center gap-1 pl-2 border-l border-zinc-800">
+                    {/* Desktop Action Buttons */}
+                    <div className="flex items-center gap-1 pl-3 border-l border-zinc-800">
                       <button
                         onClick={() => handleProbeSite(mon.url)}
                         className="p-1.5 rounded-lg text-zinc-400 hover:text-emerald-400 hover:bg-zinc-800 transition-colors"
@@ -620,6 +656,28 @@ export default function StatusPage() {
                   </div>
                 </div>
 
+                {/* Mobile/Tablet Dedicated Telemetry Stats Bar */}
+                <div className="grid grid-cols-3 gap-2 py-2 px-3 rounded-xl bg-zinc-950/70 border border-zinc-850 text-xs font-mono lg:hidden">
+                  <div>
+                    <span className="text-zinc-500 text-[10px] block">CURRENT</span>
+                    <span className="text-emerald-400 font-semibold">{mon.current_ping} ms</span>
+                  </div>
+                  <div className="text-center">
+                    <span className="text-zinc-500 text-[10px] block">MIN / MAX</span>
+                    <span className="text-zinc-300 font-semibold text-[11px]">
+                      {mon.min_ping ?? mon.current_ping}/{mon.max_ping ?? mon.current_ping} ms
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-zinc-500 text-[10px] block">
+                      {timeWindow === "24h" ? "24H UPTIME" : "30D UPTIME"}
+                    </span>
+                    <span className="text-white font-semibold">
+                      {timeWindow === "24h" ? mon.uptime24h : mon.uptime30d}%
+                    </span>
+                  </div>
+                </div>
+
                 {/* Operational Timeline Bars */}
                 <div className="space-y-1.5 pt-1">
                   <div className="flex items-center justify-between text-[10px] text-zinc-500 font-mono">
@@ -632,7 +690,7 @@ export default function StatusPage() {
 
                   {/* Render Aggregated Buckets (30d, 7d, 24h) OR Live Ticks */}
                   {timeWindow !== "ticks" ? (
-                    <div className="flex items-center gap-1 w-full">
+                    <div className="flex items-center gap-0.5 sm:gap-1 w-full overflow-hidden">
                       {activeBuckets.map((bucket, i) => {
                         let barColor = "bg-emerald-500/80 hover:bg-emerald-400";
                         if (bucket.status === "no_data") {
@@ -651,19 +709,19 @@ export default function StatusPage() {
                           <div
                             key={i}
                             title={tooltip}
-                            className={`h-7 flex-1 rounded-sm transition-all hover:scale-110 cursor-pointer ${barColor}`}
+                            className={`h-7 flex-1 min-w-[3px] sm:min-w-[5px] rounded-xs sm:rounded-sm transition-all hover:scale-110 cursor-pointer ${barColor}`}
                           />
                         );
                       })}
                     </div>
                   ) : (
                     /* Live Ticks (Raw 30-Heartbeat Stream) */
-                    <div className="flex items-center gap-1 w-full">
+                    <div className="flex items-center gap-0.5 sm:gap-1 w-full overflow-hidden">
                       {mon.heartbeats.map((hb, i) => (
                         <div
                           key={i}
                           title={`${new Date(hb.created_at).toLocaleTimeString()}: ${hb.latency_ms}ms (${hb.status === 1 ? 'UP' : 'DOWN'})`}
-                          className={`h-7 flex-1 rounded-sm transition-all hover:scale-110 cursor-pointer ${
+                          className={`h-7 flex-1 min-w-[3px] sm:min-w-[5px] rounded-xs sm:rounded-sm transition-all hover:scale-110 cursor-pointer ${
                             hb.status === 1 
                               ? "bg-emerald-500/80 hover:bg-emerald-400" 
                               : "bg-rose-500 hover:bg-rose-400"
@@ -675,7 +733,7 @@ export default function StatusPage() {
 
                   <div className="flex items-center justify-between text-[9px] text-zinc-500 font-mono">
                     <span>{startLabel}</span>
-                    <span className="text-zinc-600">Hover bar for latency & check details</span>
+                    <span className="hidden sm:inline text-zinc-600">Hover bar for latency & check details</span>
                     <span>{endLabel}</span>
                   </div>
                 </div>
@@ -731,7 +789,7 @@ export default function StatusPage() {
       {/* Add Monitor Modal */}
       {isAddModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="relative w-full max-w-md rounded-2xl bg-[#111114] border border-zinc-800 p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150 space-y-4">
+          <div className="relative w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl bg-[#111114] border border-zinc-800 p-5 sm:p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150 space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
               <div className="flex items-center gap-2">
                 <Plus className="h-4 w-4 text-emerald-400" />
@@ -829,7 +887,7 @@ export default function StatusPage() {
       {/* Edit Monitor Modal */}
       {editingMon && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="relative w-full max-w-md rounded-2xl bg-[#111114] border border-zinc-800 p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150 space-y-4">
+          <div className="relative w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl bg-[#111114] border border-zinc-800 p-5 sm:p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150 space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
               <div className="flex items-center gap-2">
                 <Settings className="h-4 w-4 text-sky-400" />
