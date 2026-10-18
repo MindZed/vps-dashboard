@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { getAgentUpstreamHeaders } from "@/lib/upstream-auth";
 
 const AGENT_URL = process.env.AGENT_URL || process.env.NEXT_PUBLIC_AGENT_URL || "https://agent.mindzed.tech";
-const AGENT_SECRET = process.env.AGENT_SECRET || process.env.NEXT_PUBLIC_AGENT_SECRET || "dfb2bd78acdzfdxarf379161b46bd31e0890610fab9028x1";
 
 async function proxyRequest(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   // 1. Session verification: User must be signed in with GitHub
@@ -20,16 +20,17 @@ async function proxyRequest(req: NextRequest, { params }: { params: Promise<{ pa
   const searchParams = req.nextUrl.search;
   const upstreamUrl = `${AGENT_URL}/api/v1/${targetPath}${searchParams}`;
 
-  const headers: Record<string, string> = {
-    "X-Agent-Secret": AGENT_SECRET,
-    "Accept": "application/json",
+  const customHeaders: Record<string, string> = {
     "User-Agent": req.headers.get("user-agent") || "Mozilla/5.0 (Windows NT 10.0; Win64; x64) MindzedHub/1.0",
   };
 
   const contentType = req.headers.get("content-type");
   if (contentType) {
-    headers["Content-Type"] = contentType;
+    customHeaders["Content-Type"] = contentType;
   }
+
+  const headers = getAgentUpstreamHeaders(customHeaders);
+
 
   let body: BodyInit | undefined;
   if (["POST", "PUT", "PATCH"].includes(req.method)) {

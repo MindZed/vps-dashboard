@@ -135,8 +135,6 @@ export function generateSecretKey(): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-const DEFAULT_AGENT_SECRET = "dfb2bd78acdzfdxarf379161b46bd31e0890610fab9028x1";
-
 export function getAgentConfig() {
   if (typeof window !== "undefined") {
     const savedUrl = localStorage.getItem("mindzed_agent_url");
@@ -152,7 +150,7 @@ export function getAgentConfig() {
 
   return {
     baseUrl: process.env.AGENT_URL || process.env.NEXT_PUBLIC_AGENT_URL || "https://agent.mindzed.tech",
-    secret: process.env.AGENT_SECRET || process.env.NEXT_PUBLIC_AGENT_SECRET || DEFAULT_AGENT_SECRET,
+    secret: process.env.AGENT_SECRET || "",
     forceDemo: false,
     hasCustomKey: true,
   };
@@ -173,7 +171,13 @@ function getHeaders(extra: Record<string, string> = {}): Record<string, string> 
     ...extra,
   };
   if (typeof window === "undefined") {
-    headers["X-Agent-Secret"] = process.env.AGENT_SECRET || process.env.NEXT_PUBLIC_AGENT_SECRET || DEFAULT_AGENT_SECRET;
+    if (process.env.AGENT_SECRET) {
+      headers["X-Agent-Secret"] = process.env.AGENT_SECRET;
+    }
+    if (process.env.CF_ACCESS_CLIENT_ID && process.env.CF_ACCESS_CLIENT_SECRET) {
+      headers["CF-Access-Client-Id"] = process.env.CF_ACCESS_CLIENT_ID;
+      headers["CF-Access-Client-Secret"] = process.env.CF_ACCESS_CLIENT_SECRET;
+    }
   }
   return headers;
 }
@@ -196,40 +200,11 @@ export async function checkAgentHealth(): Promise<{
     };
   }
 
-  // 1. Attempt direct client-to-agent measurement first to bypass Vercel serverless proxy overhead
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000);
-
-    const start = performance.now();
-    const res = await fetch(`${config.baseUrl}/health`, {
-      signal: controller.signal,
-      headers: { Accept: "application/json" },
-      cache: "no-store",
-      mode: "cors",
-    });
-    clearTimeout(timeoutId);
-
-    const latencyMs = Math.round(performance.now() - start);
-    if (res.ok) {
-      const data = await res.json();
-      return {
-        ok: true,
-        status: data.status || "ok",
-        latencyMs,
-        postgres: data.postgres || "connected",
-        isMock: false,
-      };
-    }
-  } catch {
-    // If direct cross-origin fetch is blocked, fallback to serverless proxy
-  }
-
-  // 2. Fallback to Next.js server proxy if direct fetch is blocked
+  // Route through Next.js proxy-health so Cloudflare Service Token is verified at edge
   const start = performance.now();
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
 
     const res = await fetch("/api/proxy-health", {
       signal: controller.signal,
@@ -253,14 +228,15 @@ export async function checkAgentHealth(): Promise<{
     };
   } catch {
     return {
-      ok: true,
+      ok: false,
       status: "fallback (Agent Unreachable)",
-      latencyMs: 24,
-      postgres: "connected (mock)",
+      latencyMs: 0,
+      postgres: "unknown",
       isMock: true,
     };
   }
 }
+
 
 export async function fetchSystemVitals(): Promise<{ vitals: SystemVitals; isMock: boolean }> {
   const config = getAgentConfig();

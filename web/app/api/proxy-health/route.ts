@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getAgentUpstreamHeaders } from "@/lib/upstream-auth";
 
 const AGENT_URL = process.env.AGENT_URL || process.env.NEXT_PUBLIC_AGENT_URL || "https://agent.mindzed.tech";
 
@@ -10,9 +11,11 @@ export async function GET() {
 
     const res = await fetch(`${AGENT_URL}/health`, {
       signal: controller.signal,
+      headers: getAgentUpstreamHeaders(),
       cache: "no-store",
     });
     clearTimeout(timeoutId);
+
 
     const latencyMs = Math.round(performance.now() - start);
     if (!res.ok) {

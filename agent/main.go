@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/subtle"
 	"fmt"
 	"log"
 	"net/http"
@@ -215,7 +216,7 @@ func main() {
 			}
 		}
 
-		if clientSecret == "" || clientSecret != agentSecret {
+		if clientSecret == "" || subtle.ConstantTimeCompare([]byte(clientSecret), []byte(agentSecret)) != 1 {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
 				"error":   "Unauthorized",
 				"message": "Missing or invalid X-Agent-Secret header",

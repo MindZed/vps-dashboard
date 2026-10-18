@@ -13,7 +13,7 @@ RestartSec=3s
 Environment=PORT=8085
 Environment=BIND_HOST=127.0.0.1
 Environment=SENTINEL_DB_PATH=/opt/mindzed-sentinel/data/sentinel.db
-Environment=SENTINEL_SECRET=dfb2bd78acdzfdxarf379161b46bd31e0890610fab9028x1
+Environment=SENTINEL_SECRET=your_strong_32_char_sentinel_secret
 
 # Hardened Security Sandbox
 ProtectSystem=full

@@ -1,9 +1,8 @@
 import NextAuth, { AuthOptions } from "next-auth";
 import GithubProvider from "next-auth/providers/github";
-import CredentialsProvider from "next-auth/providers/credentials";
+import { getAgentUpstreamHeaders } from "@/lib/upstream-auth";
 
 const AGENT_URL = process.env.AGENT_URL || process.env.NEXT_PUBLIC_AGENT_URL || "https://agent.mindzed.tech";
-const AGENT_SECRET = process.env.AGENT_SECRET || process.env.NEXT_PUBLIC_AGENT_SECRET || "dfb2bd78acdzfdxarf379161b46bd31e0890610fab9028x1";
 
 export const authOptions: AuthOptions = {
   providers: [
@@ -15,31 +14,6 @@ export const authOptions: AuthOptions = {
           }),
         ]
       : []),
-    CredentialsProvider({
-      id: "admin-key",
-      name: "Admin Master Key",
-      credentials: {
-        username: { label: "GitHub Username", type: "text", placeholder: "mindzed" },
-        secretKey: { label: "Master Secret Key", type: "password" },
-      },
-      async authorize(credentials) {
-        if (!credentials?.username || !credentials?.secretKey) {
-          return null;
-        }
-
-        // Validate secret key against AGENT_SECRET
-        if (credentials.secretKey.trim() !== AGENT_SECRET.trim()) {
-          return null;
-        }
-
-        return {
-          id: credentials.username,
-          name: credentials.username,
-          email: `${credentials.username}@github.local`,
-          image: `https://github.com/${credentials.username}.png`,
-        };
-      },
-    }),
   ],
   pages: {
     signIn: "/login",
@@ -49,12 +23,7 @@ export const authOptions: AuthOptions = {
     strategy: "jwt",
   },
   callbacks: {
-    async signIn({ user, profile, account }) {
-      // If signed in with master key credentials, permit access immediately
-      if (account?.provider === "admin-key") {
-        return true;
-      }
-
+    async signIn({ user, profile }) {
       const githubUsername = (profile as { login?: string })?.login || user.name || "";
       if (!githubUsername) return false;
 
@@ -69,14 +38,14 @@ export const authOptions: AuthOptions = {
         }
       }
 
-      // 2. Query Agent file-based whitelist
+      // 2. Query Agent file-based whitelist (protected by Cloudflare Zero Trust & Agent Secret)
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 4000);
 
         const res = await fetch(`${AGENT_URL}/api/v1/auth/whitelist`, {
           signal: controller.signal,
-          headers: { "X-Agent-Secret": AGENT_SECRET },
+          headers: getAgentUpstreamHeaders(),
           cache: "no-store",
         });
         clearTimeout(timeoutId);
@@ -94,10 +63,7 @@ export const authOptions: AuthOptions = {
           if (!data.has_admin) {
             await fetch(`${AGENT_URL}/api/v1/auth/whitelist/claim`, {
               method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "X-Agent-Secret": AGENT_SECRET,
-              },
+              headers: getAgentUpstreamHeaders({ "Content-Type": "application/json" }),
               body: JSON.stringify({ username: cleanGithubUser }),
             });
             return true;
@@ -115,8 +81,8 @@ export const authOptions: AuthOptions = {
         console.warn("Could not verify against live agent whitelist:", err);
       }
 
-      // Fallback: If GitHub OAuth is in local dev mode without credentials
-      if (!process.env.GITHUB_ID || !process.env.GITHUB_SECRET) {
+      // Fallback: If strictly in local development mode without GitHub OAuth credentials
+      if (process.env.NODE_ENV === "development" && (!process.env.GITHUB_ID || !process.env.GITHUB_SECRET)) {
         return true;
       }
 
@@ -137,8 +103,9 @@ export const authOptions: AuthOptions = {
       return session;
     },
   },
-  secret: process.env.NEXTAUTH_SECRET || "mindzed-jwt-session-secret-change-me",
+  secret: process.env.NEXTAUTH_SECRET,
 };
 
 const handler = NextAuth(authOptions);
 export { handler as GET, handler as POST };
+

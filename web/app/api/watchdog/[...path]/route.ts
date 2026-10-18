@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { getWatchdogUpstreamHeaders } from "@/lib/upstream-auth";
 
 const WATCHDOG_URL = process.env.WATCHDOG_URL || process.env.NEXT_PUBLIC_WATCHDOG_URL || process.env.NEXT_PUBLIC_KUMA_URL || "https://status.mindzed.tech";
-const AGENT_SECRET = process.env.WATCHDOG_SECRET || process.env.AGENT_SECRET || process.env.NEXT_PUBLIC_AGENT_SECRET || "dfb2bd78acdzfdxarf379161b46bd31e0890610fab9028x1";
 
 async function proxyWatchdog(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   // 1. Session check: User must be signed in
@@ -20,16 +20,17 @@ async function proxyWatchdog(req: NextRequest, { params }: { params: Promise<{ p
   const searchParams = req.nextUrl.search;
   const upstreamUrl = `${WATCHDOG_URL}/api/v1/${targetPath}${searchParams}`;
 
-  const headers: Record<string, string> = {
-    "X-Agent-Secret": AGENT_SECRET,
-    "Accept": "application/json",
+  const customHeaders: Record<string, string> = {
     "User-Agent": "MindzedHub/1.0",
   };
 
   const contentType = req.headers.get("content-type");
   if (contentType) {
-    headers["Content-Type"] = contentType;
+    customHeaders["Content-Type"] = contentType;
   }
+
+  const headers = getWatchdogUpstreamHeaders(customHeaders);
+
 
   let body: BodyInit | undefined;
   if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {

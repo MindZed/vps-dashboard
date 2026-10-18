@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/subtle"
 	"fmt"
 	"log"
 	"net/http"
@@ -16,8 +17,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
-
-const DEFAULT_SECRET = "dfb2bd78acdzfdxarf379161b46bd31e0890610fab9028x1"
 
 func main() {
 	log.Println("[INIT] Starting MindZed Sentinel - Enterprise Micro Watchdog...")
@@ -75,12 +74,12 @@ func main() {
 		agentSecret = os.Getenv("AGENT_SECRET")
 	}
 	if agentSecret == "" {
-		agentSecret = DEFAULT_SECRET
+		log.Println("[SECURITY WARNING] SENTINEL_SECRET / AGENT_SECRET not configured!")
 	}
 
 	authMiddleware := func(c *gin.Context) {
 		token := c.GetHeader("X-Agent-Secret")
-		if token == "" || token != agentSecret {
+		if token == "" || agentSecret == "" || subtle.ConstantTimeCompare([]byte(token), []byte(agentSecret)) != 1 {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
 				"error":   "Unauthorized",
 				"message": "Invalid or missing X-Agent-Secret",
