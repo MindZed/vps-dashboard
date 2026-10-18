@@ -276,7 +276,16 @@ func (b *BotClient) handleCommand(msg *TelegramMessage) {
 				}
 			}
 
+			if isMember {
+				_ = b.SendMessage(senderID, "👋 *Welcome back to MindZed Alerts!*\nYou are an active recipient of real-time infrastructure alerts.")
+			} else {
+				_ = b.SendMessage(senderID, "🔒 *MindZed Sentinel Access Restricted*\nPlease ask the administrator to onboard your Telegram ID (`"+senderID+"`).")
+			}
+		}
 
+	case "/onboard":
+		if !isAdmin {
+			_ = b.SendMessage(senderID, "⛔ *Access Denied*: Only the administrator can onboard new recipients.")
 			return
 		}
 
