@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptrace"
+	"os"
 	"strings"
 	"time"
 )
@@ -82,6 +83,24 @@ func ProbeHTTP(rawURL string, timeout time.Duration) *ProbeResult {
 		return result
 	}
 	req.Header.Set("User-Agent", "MindZed-Sentinel/1.0 (Enterprise Watchdog)")
+
+	// If probing agent.mindzed.tech, inject Cloudflare Zero Trust credentials
+	if strings.Contains(rawURL, "agent.mindzed.tech") {
+		if cfID := os.Getenv("CF_ACCESS_CLIENT_ID"); cfID != "" {
+			req.Header.Set("CF-Access-Client-Id", cfID)
+		}
+		if cfSecret := os.Getenv("CF_ACCESS_CLIENT_SECRET"); cfSecret != "" {
+			req.Header.Set("CF-Access-Client-Secret", cfSecret)
+		}
+		agentSec := os.Getenv("AGENT_SECRET")
+		if agentSec == "" {
+			agentSec = os.Getenv("SENTINEL_SECRET")
+		}
+		if agentSec != "" {
+			req.Header.Set("X-Agent-Secret", agentSec)
+		}
+	}
+
 	req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
 
 	client := &http.Client{
