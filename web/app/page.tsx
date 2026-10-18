@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { fetchSystemVitals, SystemVitals, fetchDatabases } from "@/lib/agent-client";
 import { fetchWatchdogStatus } from "@/lib/sentinel-client";
+import { fetchBandwidthSummary, BandwidthSummaryResponse } from "@/lib/bandwidth-client";
 import { ResourceDataPoint } from "@/components/charts/ResourceHistory";
 
 // Dynamic imports for ECharts to ensure SSR safety
@@ -56,6 +57,7 @@ export default function OverviewPage() {
   const [history, setHistory] = useState<ResourceDataPoint[]>([]);
   const [dbCount, setDbCount] = useState<number>(3);
   const [kumaUptime, setKumaUptime] = useState<number>(99.98);
+  const [bandwidth, setBandwidth] = useState<BandwidthSummaryResponse | null>(null);
   const [isMock, setIsMock] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string>("");
@@ -94,6 +96,7 @@ export default function OverviewPage() {
     pollVitals();
     fetchDatabases().then((r) => setDbCount(r.databases.length));
     fetchWatchdogStatus().then((r) => setKumaUptime(r.overall_uptime));
+    fetchBandwidthSummary().then((r) => setBandwidth(r));
 
     const interval = setInterval(pollVitals, 3500);
     return () => clearInterval(interval);
@@ -256,23 +259,47 @@ export default function OverviewPage() {
           </p>
         </div>
 
-        {/* Card 3: Databases Fleet */}
+        {/* Card 3: Monthly Data Egress (10 TB Free Tier Limit) */}
         <Link
-          href="/databases"
+          href="/bandwidth"
           className="group rounded-2xl bg-zinc-900/30 border border-zinc-800/80 hover:border-zinc-600 p-5 backdrop-blur-sm space-y-3 transition-all cursor-pointer block"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider group-hover:text-emerald-400 transition-colors">
-              PostgreSQL Fleet
+            <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider group-hover:text-sky-400 transition-colors">
+              Monthly Data Egress
             </span>
-            <ArrowUpRight className="h-4 w-4 text-zinc-500 group-hover:text-emerald-400 transition-colors" />
+            <ArrowUpRight className="h-4 w-4 text-zinc-500 group-hover:text-sky-400 transition-colors" />
           </div>
-          <div className="text-2xl font-bold font-mono text-emerald-400">
-            {dbCount} <span className="text-xs text-zinc-500 font-sans font-normal">Databases</span>
+          <div className="flex items-baseline justify-between">
+            <div className="text-2xl font-bold font-mono text-white">
+              {bandwidth ? bandwidth.current_month_egress_gb.toFixed(1) : "14.8"} <span className="text-xs text-zinc-500 font-sans font-normal">GB</span>
+            </div>
+            <div className="text-xs font-mono text-zinc-400">
+              of 10,000 GB (10 TB)
+            </div>
           </div>
-          <p className="text-xs text-zinc-400">
-            Managed clusters inside Dokploy Swarm.
-          </p>
+          <div className="space-y-1">
+            <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-500 ${
+                  (bandwidth?.percent_used ?? 0) > 90
+                    ? "bg-rose-500"
+                    : (bandwidth?.percent_used ?? 0) > 70
+                    ? "bg-amber-400"
+                    : "bg-sky-400"
+                }`}
+                style={{ width: `${Math.min(100, Math.max(1, (bandwidth?.percent_used ?? 0.15)))}%` }}
+              />
+            </div>
+            <div className="flex justify-between text-[10px] text-zinc-500 font-mono">
+              <span>{(bandwidth?.percent_used ?? 0.15).toFixed(2)}% of free tier</span>
+              <span className={(bandwidth?.current_month_egress_gb ?? 0) > 10000 ? "text-rose-400 font-semibold" : "text-zinc-500"}>
+                {(bandwidth?.current_month_egress_gb ?? 0) > 10000
+                  ? `+${((bandwidth?.current_month_egress_gb ?? 0) - 10000).toFixed(1)} GB OVERFLOW`
+                  : `${(10000 - (bandwidth?.current_month_egress_gb ?? 14.8)).toFixed(1)} GB remaining`}
+              </span>
+            </div>
+          </div>
         </Link>
 
         {/* Card 4: Uptime Kuma Watchdog */}

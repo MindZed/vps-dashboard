@@ -18,7 +18,8 @@ import {
   UserPlus,
   Trash2,
   Lock,
-  LogOut
+  LogOut,
+  BarChart3
 } from "lucide-react";
 import { useSession, signOut } from "next-auth/react";
 
@@ -169,9 +170,10 @@ export default function Navbar() {
 
   const navItems = [
     { label: "Overview", href: "/", icon: Activity },
+    { label: "Data Usage", href: "/bandwidth", icon: BarChart3, badge: "10 TB", badgeColor: "bg-sky-500/10 text-sky-400 border-sky-500/25" },
     { label: "Databases", href: "/databases", icon: Database, badge: "PgSQL", badgeColor: "bg-emerald-500/10 text-emerald-400 border-emerald-500/25" },
     { label: "Ports", href: "/ports", icon: Shield, badgeColor: "bg-amber-500/10 text-amber-400 border-amber-500/25" },
-    { label: "Watchdog", href: "/status", icon: ShieldCheck, badge: "Sentinel", badgeColor: "bg-sky-500/10 text-sky-400 border-sky-500/25" },
+    { label: "Watchdog", href: "/status", icon: ShieldCheck, badge: "Sentinel", badgeColor: "bg-purple-500/10 text-purple-400 border-purple-500/25" },
   ];
 
   return (

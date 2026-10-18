@@ -46,6 +46,13 @@ type Incident struct {
 	DurationSec int     `json:"duration_sec"`
 }
 
+type TelegramSubscriber struct {
+	ChatID    string `json:"chat_id"`
+	Username  string `json:"username"`
+	Role      string `json:"role"` // "admin" or "member"
+	CreatedAt string `json:"created_at"`
+}
+
 type UptimeBucket struct {
 	TimeLabel     string  `json:"time_label"`     // e.g. "Oct 11" or "15:00"
 	DateKey       string  `json:"date_key"`       // "2026-10-11" or "2026-10-11 15:00"
@@ -143,6 +150,13 @@ func (s *Store) migrate() error {
 		resolved_at DATETIME,
 		duration_sec INTEGER NOT NULL DEFAULT 0
 	);
+
+	CREATE TABLE IF NOT EXISTS telegram_subscribers (
+		chat_id TEXT PRIMARY KEY,
+		username TEXT,
+		role TEXT NOT NULL DEFAULT 'member',
+		created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+	);
 	`
 	_, err := s.db.Exec(schema)
 	return err
@@ -167,6 +181,14 @@ func (s *Store) seedDefaultMonitors() {
 		_, _ = s.db.Exec(
 			"INSERT INTO monitors (id, name, url, type, interval_sec, active) VALUES (?, ?, ?, ?, ?, ?)",
 			m.ID, m.Name, m.URL, m.Type, m.IntervalSec, 1,
+		)
+	}
+
+	// Seed default administrator for Telegram alerts if configured in environment
+	if adminID := os.Getenv("TELEGRAM_ADMIN_CHAT_ID"); adminID != "" {
+		_, _ = s.db.Exec(
+			"INSERT OR IGNORE INTO telegram_subscribers (chat_id, username, role) VALUES (?, 'admin', 'admin')",
+			adminID,
 		)
 	}
 }
@@ -533,7 +555,7 @@ func (s *Store) RecordIncident(monitorID, monitorName, title, impact, errMsg str
 	return id, err
 }
 
-func (s *Store) ResolveIncident(monitorID string) error {
+func (s *Store) ResolveIncident(monitorID string) (int, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -542,11 +564,54 @@ func (s *Store) ResolveIncident(monitorID string) error {
 	var startedAt time.Time
 	err := s.db.QueryRow("SELECT id, started_at FROM incidents WHERE monitor_id = ? AND status = 'active' ORDER BY started_at DESC LIMIT 1", monitorID).Scan(&id, &startedAt)
 	if err != nil {
-		return nil // No active incident
+		return 0, nil // No active incident
 	}
 
 	duration := int(time.Since(startedAt).Seconds())
 	_, err = s.db.Exec("UPDATE incidents SET status = 'resolved', resolved_at = CURRENT_TIMESTAMP, duration_sec = ? WHERE id = ?", duration, id)
+	return duration, err
+}
+
+func (s *Store) ListTelegramSubscribers() ([]TelegramSubscriber, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	rows, err := s.db.Query("SELECT chat_id, COALESCE(username, ''), role, created_at FROM telegram_subscribers ORDER BY created_at ASC")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var subs []TelegramSubscriber
+	for rows.Next() {
+		var sub TelegramSubscriber
+		if err := rows.Scan(&sub.ChatID, &sub.Username, &sub.Role, &sub.CreatedAt); err != nil {
+			continue
+		}
+		subs = append(subs, sub)
+	}
+	return subs, nil
+}
+
+func (s *Store) AddTelegramSubscriber(chatID, username, role string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if role == "" {
+		role = "member"
+	}
+	_, err := s.db.Exec(
+		"INSERT INTO telegram_subscribers (chat_id, username, role) VALUES (?, ?, ?) ON CONFLICT(chat_id) DO UPDATE SET username = excluded.username, role = excluded.role",
+		chatID, username, role,
+	)
+	return err
+}
+
+func (s *Store) RemoveTelegramSubscriber(chatID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	_, err := s.db.Exec("DELETE FROM telegram_subscribers WHERE chat_id = ?", chatID)
 	return err
 }
 

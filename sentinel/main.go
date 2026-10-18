@@ -14,6 +14,7 @@ import (
 	"mindzed-sentinel/engine"
 	"mindzed-sentinel/handler"
 	"mindzed-sentinel/storage"
+	"mindzed-sentinel/telegram"
 
 	"github.com/gin-gonic/gin"
 )
@@ -32,11 +33,22 @@ func main() {
 	}
 	defer store.Close()
 
-	// 1. Start background probe scheduler
-	stopScheduler := make(chan struct{})
-	go startScheduler(store, stopScheduler)
+	// 1. Initialize Telegram Ops Bot (reads token and admin ID from environment)
+	botToken := os.Getenv("TELEGRAM_BOT_TOKEN")
+	adminChatID := os.Getenv("TELEGRAM_ADMIN_CHAT_ID")
+	bot := telegram.NewBot(botToken, adminChatID, store)
 
-	// 2. Start background 24-hour cleanup job
+	botCtx, cancelBot := context.WithCancel(context.Background())
+	defer cancelBot()
+	if botToken != "" {
+		go bot.StartPolling(botCtx)
+	}
+
+	// 2. Start background probe scheduler
+	stopScheduler := make(chan struct{})
+	go startScheduler(store, bot, stopScheduler)
+
+	// 3. Start background 24-hour cleanup job
 	go func() {
 		ticker := time.NewTicker(24 * time.Hour)
 		defer ticker.Stop()
@@ -46,7 +58,7 @@ func main() {
 		}
 	}()
 
-	// 3. HTTP Server Setup
+	// 4. HTTP Server Setup
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
 	r.Use(gin.Recovery())
@@ -143,7 +155,7 @@ func main() {
 	log.Println("[SHUTDOWN] Sentinel stopped cleanly.")
 }
 
-func startScheduler(store *storage.Store, stop <-chan struct{}) {
+func startScheduler(store *storage.Store, bot *telegram.BotClient, stop <-chan struct{}) {
 	// Master scheduler ticks every 5 seconds to evaluate monitor interval triggers
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
@@ -198,12 +210,18 @@ func startScheduler(store *storage.Store, stop <-chan struct{}) {
 						impact := "major"
 						_, _ = store.RecordIncident(mon.ID, mon.Name, title, impact, res.ErrorMessage)
 						log.Printf("[ALERT] Incident triggered: %s", title)
+						if bot != nil {
+							bot.BroadcastAlert(mon.Name, mon.URL, res.ErrorMessage)
+						}
 					}
 				} else if statusInt == 1 {
 					if activeIncidentMap[mon.ID] {
 						activeIncidentMap[mon.ID] = false
-						_ = store.ResolveIncident(mon.ID)
-						log.Printf("[RECOVERY] Service restored: %s (%dms)", mon.Name, res.LatencyMs)
+						duration, _ := store.ResolveIncident(mon.ID)
+						log.Printf("[RECOVERY] Service restored: %s (%dms, duration: %ds)", mon.Name, res.LatencyMs, duration)
+						if bot != nil {
+							bot.BroadcastRecovery(mon.Name, mon.URL, res.LatencyMs, duration)
+						}
 					}
 				}
 			}(m)
@@ -222,4 +240,3 @@ func startScheduler(store *storage.Store, stop <-chan struct{}) {
 		}
 	}
 }
-

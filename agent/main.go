@@ -161,6 +161,7 @@ func main() {
 	dbManager := handler.NewDBManager(pool, pgConnString)
 	explorerManager := handler.NewExplorerManager(pgConnString)
 	backupManager := handler.NewBackupManager(pool, pgConnString)
+	bandwidthManager := handler.NewBandwidthManager("")
 
 	// 4. Gin Router Setup
 	r := gin.New()
@@ -233,6 +234,10 @@ func main() {
 		// System telemetry & Network ports
 		v1.GET("/system/vitals", handler.GetSystemVitalsHandler)
 		v1.GET("/system/network/ports", handler.GetNetworkPortsHandler)
+
+		// OCI Bandwidth Telemetry & History
+		v1.GET("/bandwidth/history", bandwidthManager.GetBandwidthHistory)
+		v1.GET("/bandwidth/live", bandwidthManager.GetLiveBandwidth)
 
 		// Neon-style Database Provisioning & Cloning
 		v1.GET("/databases", dbManager.ListDatabases)

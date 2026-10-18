@@ -21,10 +21,12 @@ web/.env*.local
 agent/.env
 !**/.env.example
 
-# Agent runtime data
+# Agent runtime data & Binaries
 agent/whitelist.json
 agent/data/
 *.exe
+*-linux-*
+*.pem
 
 # Logs
 npm-debug.log*
