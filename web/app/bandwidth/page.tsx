@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { 
-  Wifi, 
   ArrowUpRight, 
   ArrowDownLeft, 
   RefreshCw, 
@@ -33,6 +32,11 @@ const BandwidthHistoryChart = dynamic(
   }
 );
 
+function formatUtcTime(date = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}:${pad(date.getUTCSeconds())} UTC`;
+}
+
 export default function BandwidthPage() {
   const [data, setData] = useState<BandwidthSummaryResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -44,7 +48,7 @@ export default function BandwidthPage() {
     try {
       const summary = await fetchBandwidthSummary();
       setData(summary);
-      setLastLiveSync(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+      setLastLiveSync(formatUtcTime());
     } catch (e) {
       console.error("Failed to load bandwidth data", e);
     } finally {
@@ -64,7 +68,7 @@ export default function BandwidthPage() {
           today_live_ingress_gb: live.today_ingress_gb,
         };
       });
-      setLastLiveSync(live.synced_at || new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+      setLastLiveSync(formatUtcTime());
     } catch (e) {
       console.error("Live ping error", e);
     } finally {
@@ -88,16 +92,10 @@ export default function BandwidthPage() {
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-zinc-800">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-              <Wifi className="h-5 w-5 text-sky-400" />
-              Data Usage & OCI Egress
-            </h1>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-mono uppercase font-semibold border bg-sky-500/10 border-sky-500/30 text-sky-400">
-              10 TB Free Tier
-            </span>
-          </div>
-          <p className="text-xs text-zinc-400">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
+            Data Egress
+          </h1>
+          <p className="text-xs text-zinc-400 mt-1">
             Oracle Cloud Always-Free Tier Tenancy • Region: <span className="font-mono text-zinc-300">ap-hyderabad-1</span>
           </p>
         </div>
